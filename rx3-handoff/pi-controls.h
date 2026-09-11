@@ -1,7 +1,11 @@
 #ifndef PI_CONTROLS_H
 #define PI_CONTROLS_H
-#define UI_STATE "/home/rx3/rx3-rootfs/dev/rx3-ui-state"
-#define UI_CONTROL "/home/rx3/rx3-rootfs/dev/rx3-control"
+/* Override at build time: gcc -DRX3_ROOT_PATH='"/home/you/rx3-rootfs"' ... (install.sh does this). */
+#ifndef RX3_ROOT_PATH
+#define RX3_ROOT_PATH "/home/rx3/rx3-rootfs"
+#endif
+#define UI_STATE RX3_ROOT_PATH "/dev/rx3-ui-state"
+#define UI_CONTROL RX3_ROOT_PATH "/dev/rx3-control"
 #define CONTENT_X 160
 #define CONTENT_W 1600
 #define CONTENT_H 1000

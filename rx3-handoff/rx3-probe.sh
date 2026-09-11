@@ -1,6 +1,7 @@
 #!/bin/bash
 # Deck/routing probe helpers: playing <1|2> reports whether a deck's time display is changing; peaks prints the meter.
-R=/home/rx3/rx3-rootfs; H=/home/rx3/rx3-handoff; C="python3 $H/rx3-control.py"
+. "$(dirname "$(readlink -f "$0")")/rx3-env.sh"
+R=$RX3_ROOT; H=$RX3_HOME; C="python3 $H/rx3-control.py"
 region(){ python3 - "$R/dev/fb0" "$@" <<'PY'
 import sys,hashlib
 fb,x0,y0,x1,y1=sys.argv[1],*map(int,sys.argv[2:6]); d=open(fb,'rb').read(); h=hashlib.md5()

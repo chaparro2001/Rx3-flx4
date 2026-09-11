@@ -30,10 +30,12 @@ in `rx3-handoff/extracted/` and `build-rootfs.sh` will assemble the chroot from 
 
 | Path | Purpose |
 |------|---------|
-| `rx3-handoff/` | Everything that is copied to `/home/rx3/rx3-handoff` on the Pi |
-| `host/etc/systemd/system/` | The `rx3` service unit |
-| `host/etc/udev/rules.d/` | Hot-plug rules for USB media, the FLX4, and input devices |
-| `DEPLOY.md` | Bring-up steps for a fresh Pi 5 |
+| `rx3-handoff/` | Everything that is copied to the Pi, into `~/rx3-handoff` |
+| `rx3-handoff/install.sh` | Host-side installer, and `install.sh doctor` to check prerequisites |
+| `rx3-handoff/rx3-env.sh`, `rx3_env.py` | Path resolution — why no username is hardcoded |
+| `rx3-handoff/*.in` | Templates for the udev rules and systemd unit, filled in by `install.sh` |
+| `rx3-handoff/legacy/` | Dead prototype code from the first machine. Ignore it |
+| `INSTALL.md` | Step-by-step bring-up, and troubleshooting |
 | `rx3-handoff/PI-SETUP-NOTES.md` | The detailed reference: key codes, audio routing, USB semantics, traps |
 
 ### The interesting pieces
@@ -50,8 +52,19 @@ in `rx3-handoff/extracted/` and `build-rootfs.sh` will assemble the chroot from 
 
 ## Quick start
 
-See [`DEPLOY.md`](DEPLOY.md). In short: install the packages, copy `rx3-handoff/` to the Pi, recover
-the firmware into `extracted/`, run `build-rootfs.sh`, install the host config, `systemctl enable --now rx3`.
+Full steps are in **[`INSTALL.md`](INSTALL.md)**. In short, on the Pi:
+
+```bash
+cp -r Rx3-flx4/rx3-handoff ~/rx3-handoff && cd ~/rx3-handoff && chmod +x *.sh
+python3 recover-firmware.py && python3 extract_cramfs.py   # you supply the firmware
+./install.sh doctor                                        # checks prerequisites, changes nothing
+./build-rootfs.sh                                          # assembles the chroot
+./install.sh                                               # udev rules, systemd unit, helper binaries
+sudo systemctl enable --now rx3
+```
+
+No username is baked in. `rx3-env.sh` and `rx3_env.py` resolve every path from where the scripts
+live and who owns them, and each one can be overridden with an `RX3_*` environment variable.
 
 ## Legal
 

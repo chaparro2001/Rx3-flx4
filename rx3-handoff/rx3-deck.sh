@@ -1,6 +1,7 @@
 #!/bin/bash
 # Deck state helpers: `rx3-deck.sh state`, `rx3-deck.sh play <1|2>`, `rx3-deck.sh pause <1|2>` (verified from the screen).
-R=/home/rx3/rx3-rootfs; H=/home/rx3/rx3-handoff; C="python3 $H/rx3-control.py"
+. "$(dirname "$(readlink -f "$0")")/rx3-env.sh"
+R=$RX3_ROOT; H=$RX3_HOME; C="python3 $H/rx3-control.py"
 region(){ python3 - "$R/dev/fb0" "$@" <<'PY'
 import sys,hashlib
 fb,x0,y0,x1,y1=sys.argv[1],*map(int,sys.argv[2:6]); d=open(fb,'rb').read(); h=hashlib.md5()

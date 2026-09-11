@@ -1,0 +1,24 @@
+# Resolve the RX3 install layout. Sourced by every script in this directory:
+#   . "$(dirname "$(readlink -f "$0")")/rx3-env.sh"
+#
+# Nothing here is hardcoded to a particular username. RX3_HOME is wherever this
+# file lives; the account that owns it is the account the player runs as, and
+# that account's home directory holds the chroot, the USB overlays and the logs.
+# Every value can be overridden by exporting it before the script runs.
+RX3_HOME="${RX3_HOME:-$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)}"
+RX3_USER="${RX3_USER:-$(stat -c %U "$RX3_HOME" 2>/dev/null)}"
+: "${RX3_USER:=$(id -un)}"
+RX3_USERHOME="${RX3_USERHOME:-$(getent passwd "$RX3_USER" 2>/dev/null | cut -d: -f6)}"
+: "${RX3_USERHOME:=$(dirname "$RX3_HOME")}"
+RX3_ROOT="${RX3_ROOT:-$RX3_USERHOME/rx3-rootfs}"     # the ARM32 chroot
+RX3_USB="${RX3_USB:-$RX3_USERHOME/rx3-usb}"          # USB copy-on-write layers
+RX3_LOGDIR="${RX3_LOGDIR:-$RX3_USERHOME}"            # rx3-*.log
+RX3_BINDIR="${RX3_BINDIR:-$RX3_USERHOME}"            # rx3-fb-present, rx3-touch-bridge
+# Numeric identity of that account, and the groups the firmware needs inside the chroot
+# (audio for ALSA, video for the framebuffer, input for the event devices). Resolved by name,
+# because the numbers differ between distributions and between machines.
+RX3_UID="${RX3_UID:-$(id -u "$RX3_USER" 2>/dev/null || echo 1000)}"
+RX3_GID="${RX3_GID:-$(getent group video | cut -d: -f3)}"; : "${RX3_GID:=44}"
+rx3_gid_of(){ getent group "$1" | cut -d: -f3; }
+RX3_GROUPS="${RX3_GROUPS:-$(printf '%s,%s,%s' "$(rx3_gid_of audio)" "$(rx3_gid_of video)" "$(rx3_gid_of input)")}"
+export RX3_HOME RX3_USER RX3_USERHOME RX3_ROOT RX3_USB RX3_LOGDIR RX3_BINDIR RX3_UID RX3_GID RX3_GROUPS

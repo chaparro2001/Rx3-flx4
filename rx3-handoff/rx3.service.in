@@ -5,8 +5,8 @@ Wants=network-online.target sound.target
 
 [Service]
 Type=forking
-ExecStart=/home/rx3/rx3-handoff/rx3-start.sh
-ExecStop=/home/rx3/rx3-handoff/rx3-stop.sh
+ExecStart=@RX3_HOME@/rx3-start.sh
+ExecStop=@RX3_HOME@/rx3-stop.sh
 TimeoutStopSec=20
 TimeoutStartSec=120
 RemainAfterExit=yes

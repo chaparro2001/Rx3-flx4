@@ -7,7 +7,8 @@ usage: rx3-control.py mount [usb1|usb2] [chroot-path]
        rx3-control.py release <keyname> [channel] (release only)
 """
 import os,struct,time,sys
-root=os.environ.get('RX3_ROOT','/home/rx3/rx3-rootfs')
+import rx3_env
+root=rx3_env.ROOT
 keys={'usb1':0x209,'usb2':0x20a,'browse':0x202,'source':0x201,'menu':0x206,'info':0x20b,'search':0x205,'playlist':0x204,
  'play':0x4101,'cue':0x4102,'shift':0x4103,'vinyl':0x4104,'sync':0x4112,'master':0x4111,'load':0x4311,'enter':0x420c,'back':0x420d,
  'hotcue':0x4113,'beatloop':0x4114,'beatjump':0x4116,'loopin':0x410c,'loopout':0x410d,'reloop':0x410e,'slip':0x4110,'quantize':0x410b,

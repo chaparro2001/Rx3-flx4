@@ -1,9 +1,21 @@
 #!/bin/bash
-# Assemble the isolated RX3 chroot from the recovered firmware. Runs as user rx3 (no root needed).
+# Assemble the isolated RX3 chroot from the recovered firmware. Run as your normal user (no root needed).
 set -euo pipefail
-H=/home/rx3/rx3-handoff
+. "$(dirname "$(readlink -f "$0")")/rx3-env.sh"
+H=$RX3_HOME
 X=$H/extracted
-R=/home/rx3/rx3-rootfs
+R=$RX3_ROOT
+# Preflight: the firmware must already be recovered, or the chroot ends up an empty directory.
+for need in "$X/runtime-files" "$X/player/pdj/rbp" "$H/runtime-symlinks.json"; do
+  [ -e "$need" ] && continue
+  echo "ERROR: missing $need" >&2
+  echo "Run these first, in this order, from $H:" >&2
+  echo "  python3 recover-firmware.py     # downloads + decrypts the official firmware" >&2
+  echo "  python3 extract_cramfs.py       # produces extracted/runtime-files and runtime-symlinks.json" >&2
+  exit 1
+done
+command -v arm-linux-gnueabi-gcc >/dev/null || { echo "ERROR: arm-linux-gnueabi-gcc not installed (apt install gcc-arm-linux-gnueabi)" >&2; exit 1; }
+
 echo "== base runtime files"
 mkdir -p $R
 rsync -a --delete $X/runtime-files/ $R/

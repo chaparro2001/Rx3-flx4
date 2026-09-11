@@ -13,7 +13,8 @@ Usage: flx4-bridge.py [/dev/snd/midiC?D0]  (auto-detects the FLX4 if omitted)
 """
 import glob, os, struct, sys, time, threading
 
-ROOT = os.environ.get('RX3_ROOT', '/home/rx3/rx3-rootfs')
+import rx3_env
+ROOT = rx3_env.ROOT
 FIFO = ROOT + '/dev/rx3-control'
 
 # ---- RX3 firmware key ids (keycodes.txt) ----

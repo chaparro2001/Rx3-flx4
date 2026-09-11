@@ -2,7 +2,8 @@
 # Root helper for the chroot player. On USB STOP the firmware unmounts /media/usbN/<part> itself, but it runs
 # unprivileged here (EPERM, then it retries every 10 s and finally shows E-8307), so fbshim.so forwards the request
 # over the /dev/rx3-priv FIFO and this loop performs the unmount. Started by rx3-start.sh as unit rx3-priv.
-R=/home/rx3/rx3-rootfs; H=/home/rx3/rx3-handoff; F=$R/dev/rx3-priv
+. "$(dirname "$(readlink -f "$0")")/rx3-env.sh"
+R=$RX3_ROOT; H=$RX3_HOME; F=$R/dev/rx3-priv
 [ -p $F ] || mkfifo $F; chmod 622 $F; chown root:root $F      # firmware writes, only root reads
 exec 3<>$F
 while read -r cmd arg <&3; do

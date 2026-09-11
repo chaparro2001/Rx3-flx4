@@ -1,5 +1,22 @@
 # XDJ-RX3 firmware 1.19 on Raspberry Pi 5 (host `rx3`, user `rx3`) — setup notes, 2026-09-10
 
+
+## Paths and identity are resolved, not hardcoded
+
+`rx3-env.sh` (shell) and `rx3_env.py` (Python) work out the layout at run time, so no username,
+uid or gid is baked into any script:
+
+- `RX3_HOME` is the directory the scripts live in; `RX3_USER` is whoever owns it; `RX3_USERHOME`
+  is that account's home, which holds `rx3-rootfs`, `rx3-usb` and the logs.
+- `RX3_UID`/`RX3_GID` come from that account, and `RX3_GROUPS` resolves audio/video/input **by name**
+  because the numbers differ between machines (here they happen to be 29/44/996).
+- Every value can be overridden by exporting it first.
+
+The udev rules and the systemd unit need absolute paths, so they are shipped as `.in` templates and
+`install.sh` fills in `@RX3_HOME@` at install time. `install.sh doctor` checks prerequisites without
+changing anything. Note that `uhubctl` lives in `/usr/sbin`, off a normal user's PATH.
+
+
 ## Layout
 - `/home/rx3/rx3-handoff/` — recovery scripts, sources, deployment scripts (this directory).
   - `extracted/` — hash-verified official firmware: `player/pdj/rbp` (original), `gui/`, `runtime-files/` (cramfs), `update/`.
