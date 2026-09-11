@@ -17,6 +17,10 @@ echo "  chroot  $RX3_ROOT"
 echo "  overlays $RX3_USB"
 echo
 
+if [ "$RX3_UID" -lt 1000 ] && [ -z "${RX3_ALLOW_SYSTEM_USER:-}" ]; then
+  bad "this directory is owned by '$RX3_USER', a system account - run: sudo chown -R \$(id -un):\$(id -gn) $RX3_HOME"
+fi
+
 echo "Prerequisites"
 # sbin is not on a normal user's PATH, so look there too before declaring something missing.
 have(){ command -v "$1" >/dev/null || [ -x /usr/sbin/"$1" ] || [ -x /sbin/"$1" ]; }

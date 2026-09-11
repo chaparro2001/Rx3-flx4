@@ -17,3 +17,9 @@ except KeyError:
 ROOT = os.environ.get('RX3_ROOT') or os.path.join(USERHOME, 'rx3-rootfs')
 USB = os.environ.get('RX3_USB') or os.path.join(USERHOME, 'rx3-usb')
 BINDIR = os.environ.get('RX3_BINDIR') or USERHOME
+
+if os.stat(HOME).st_uid < 1000 and not os.environ.get('RX3_ALLOW_SYSTEM_USER'):
+    import sys
+    print("WARNING: %s is owned by '%s' (a system account), so the chroot would go to %s.\n"
+          "         Fix with:  sudo chown -R $(id -un):$(id -gn) %s" % (HOME, USER, ROOT, HOME),
+          file=sys.stderr)

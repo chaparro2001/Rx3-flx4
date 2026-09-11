@@ -119,6 +119,14 @@ dead prototype code you should ignore — see the README in that directory.
 | `RX3_BINDIR` | `~` (helper binaries) |
 | `RX3_LOGDIR` | `~` (`rx3-*.log`) |
 
+**"WARNING: ... is owned by a system account"**
+You copied the files with `sudo`, so the directory belongs to root and the chroot would be built in
+root's home instead of yours. Fix it with:
+
+```bash
+sudo chown -R $(id -un):$(id -gn) ~/rx3-handoff
+```
+
 **Under-voltage warnings or the FLX4 not enumerating.** Use the official 27 W supply or a powered
 USB hub. The controller draws enough to brown out a Pi 5 on an underpowered supply.
 

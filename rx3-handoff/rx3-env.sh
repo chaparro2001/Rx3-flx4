@@ -21,4 +21,12 @@ RX3_UID="${RX3_UID:-$(id -u "$RX3_USER" 2>/dev/null || echo 1000)}"
 RX3_GID="${RX3_GID:-$(getent group video | cut -d: -f3)}"; : "${RX3_GID:=44}"
 rx3_gid_of(){ getent group "$1" | cut -d: -f3; }
 RX3_GROUPS="${RX3_GROUPS:-$(printf '%s,%s,%s' "$(rx3_gid_of audio)" "$(rx3_gid_of video)" "$(rx3_gid_of input)")}"
+# A clone made with sudo leaves this directory owned by root, which would put the chroot somewhere
+# like /root/rx3-rootfs or /usr/sbin/rx3-rootfs. Say so rather than silently building in the wrong place.
+if [ "${RX3_UID:-1000}" -lt 1000 ] && [ -z "${RX3_ALLOW_SYSTEM_USER:-}" ]; then
+  echo "WARNING: $RX3_HOME is owned by '$RX3_USER' (a system account), so the chroot would go to $RX3_ROOT." >&2
+  echo "         Fix with:  sudo chown -R \$(id -un):\$(id -gn) \"$RX3_HOME\"" >&2
+  echo "         Or set RX3_ALLOW_SYSTEM_USER=1 if this is deliberate." >&2
+fi
+
 export RX3_HOME RX3_USER RX3_USERHOME RX3_ROOT RX3_USB RX3_LOGDIR RX3_BINDIR RX3_UID RX3_GID RX3_GROUPS
