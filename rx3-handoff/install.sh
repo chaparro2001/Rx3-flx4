@@ -4,6 +4,7 @@
 #   ./install.sh deps     install the Debian packages this needs
 #   ./install.sh doctor   check prerequisites only, change nothing
 #   ./install.sh          full install (binaries, udev rules, systemd unit)
+#   ./install.sh desktop  stop the player and hand the Pi back to its desktop
 set -uo pipefail
 . "$(dirname "$(readlink -f "$0")")/rx3-env.sh"
 ok(){ printf '  \033[32mok\033[0m   %s\n' "$1"; }
@@ -88,6 +89,66 @@ if [ -n "$MISSING" ]; then
   echo
 fi
 
+if [ "${1:-}" = desktop ]; then
+  # Undo everything the install changed about how the machine boots and who owns the audio devices.
+  # The chroot, the scripts and the udev rules are left alone: ./install.sh puts it back.
+  # Every step is checked against the resulting state, because a sudo that cannot prompt fails
+  # silently and reporting success we did not achieve is worse than reporting the failure.
+  sudo -v || { echo "This needs sudo. Run it from a terminal where you can enter your password." >&2; exit 1; }
+  RC=0
+
+  echo "== stopping the player"
+  sudo systemctl disable --now rx3 >/dev/null 2>&1
+  if [ "$(systemctl is-active rx3 2>/dev/null)" != active ] && [ "$(systemctl is-enabled rx3 2>/dev/null)" != enabled ]; then
+    ok "rx3 stopped, and no longer starts at boot"
+  else
+    bad "could not stop or disable rx3 (active=$(systemctl is-active rx3 2>/dev/null), enabled=$(systemctl is-enabled rx3 2>/dev/null))"; RC=1
+  fi
+
+  echo "== giving the sound devices back to PipeWire"
+  systemctl --user unmask pipewire pipewire-pulse wireplumber pipewire.socket pipewire-pulse.socket 2>/dev/null
+  systemctl --user start pipewire pipewire-pulse wireplumber 2>/dev/null
+  # Three outcomes, not two: "masked" is a real failure, but an empty answer just means there is no
+  # user session bus to ask (running over sudo, or no active login), which is not evidence of failure.
+  PWSTATE=$(systemctl --user is-enabled pipewire 2>/dev/null)
+  case "$PWSTATE" in
+    masked) bad "PipeWire is still masked for $RX3_USER"; RC=1;;
+    '')     warn "could not reach $RX3_USER's session bus to check PipeWire; verify with: systemctl --user is-enabled pipewire";;
+    *)      ok "PipeWire unmasked for $RX3_USER ($PWSTATE)";;
+  esac
+
+  echo "== restoring the desktop"
+  sudo systemctl set-default graphical.target >/dev/null 2>&1
+  if [ "$(systemctl get-default)" = graphical.target ]; then
+    ok "boots to graphical.target"
+  else
+    bad "default target is still $(systemctl get-default)"; RC=1
+  fi
+  DM=""
+  for d in lightdm gdm3 sddm greetd; do
+    systemctl list-unit-files "$d.service" 2>/dev/null | grep -q "^$d.service" && { DM=$d; break; }
+  done
+  if [ -z "$DM" ]; then
+    warn "no display manager installed - the desktop may not be installed (sudo apt install raspberrypi-ui-mods)"
+  else
+    sudo systemctl enable "$DM" >/dev/null 2>&1
+    if [ "$(systemctl is-enabled "$DM" 2>/dev/null)" = enabled ]; then
+      ok "$DM enabled"
+    else
+      bad "$DM is still $(systemctl is-enabled "$DM" 2>/dev/null)"; RC=1
+    fi
+  fi
+
+  echo
+  if [ $RC -eq 0 ]; then
+    echo "Done. Start the desktop now without rebooting:  sudo systemctl start ${DM:-lightdm}"
+    echo "Or just reboot."
+  else
+    echo "Some steps did not take effect - see the MISS lines above." >&2
+  fi
+  echo "To go back to the player:  ./install.sh && sudo systemctl enable --now rx3"
+  exit $RC
+fi
 if [ "${1:-}" = deps ]; then
   echo "== installing packages"
   sudo apt update
@@ -102,6 +163,8 @@ if [ "${1:-}" = doctor ]; then
   exit $FAIL
 fi
 [ $FAIL -ne 0 ] && { echo "Prerequisites missing - fix the MISS lines above, then re-run."; exit 1; }
+
+sudo -v || { echo "This needs sudo. Run it from a terminal where you can enter your password." >&2; exit 1; }
 
 echo "== helper binaries"
 # fb-present draws its labels with FreeType, whose headers live under /usr/include/freetype2.
@@ -126,18 +189,27 @@ ok "installed udev rules and rx3.service"
 
 echo "== audio: keep PipeWire off the sound cards"
 systemctl --user mask --now pipewire pipewire-pulse wireplumber pipewire.socket pipewire-pulse.socket 2>/dev/null
-ok "PipeWire masked for $RX3_USER"
+PWSTATE=$(systemctl --user is-enabled pipewire 2>/dev/null)
+case "$PWSTATE" in
+  masked) ok "PipeWire masked for $RX3_USER";;
+  '')     warn "could not reach $RX3_USER's session bus to mask PipeWire; run this as $RX3_USER, or verify with: systemctl --user is-enabled pipewire";;
+  *)      warn "PipeWire is $PWSTATE for $RX3_USER - it may grab the FLX4 before the player does";;
+esac
 
 echo "== console: give the player the framebuffer"
 # The player draws straight to /dev/fb0, so a running desktop would fight it for the display.
 if [ "$(systemctl get-default)" != multi-user.target ]; then
   echo "  This Pi currently boots to a desktop. The player needs the framebuffer to itself, so"
   echo "  the desktop will be disabled and the Pi will boot to a console from now on."
-  echo "  To put it back later:  sudo systemctl set-default graphical.target && sudo systemctl enable lightdm"
+  echo "  To hand it back to the desktop later, run:  ./install.sh desktop"
 fi
-sudo systemctl set-default multi-user.target >/dev/null
+sudo systemctl set-default multi-user.target >/dev/null 2>&1
 sudo systemctl disable lightdm >/dev/null 2>&1
-ok "booting to multi-user (no desktop)"
+if [ "$(systemctl get-default)" = multi-user.target ]; then
+  ok "booting to multi-user (no desktop)"
+else
+  warn "default target is still $(systemctl get-default) - the desktop will compete for the display"
+fi
 
 echo
 echo "Done. Start it with:  sudo systemctl enable --now rx3"

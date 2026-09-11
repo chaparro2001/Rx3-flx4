@@ -95,6 +95,41 @@ appears on the display. A USB mouse works as a pointer until you attach a touchs
 
 ---
 
+# Stopping the player, and getting the desktop back
+
+**Just stop it for now** (it will still start at the next boot):
+
+```bash
+sudo systemctl stop rx3
+```
+
+**Hand the Pi back to its desktop**, which is what you want if you are done with the player:
+
+```bash
+cd ~/rx3-handoff && ./install.sh desktop
+sudo systemctl start lightdm      # or just reboot
+```
+
+That reverses the three things the install changed: it stops the player and takes it out of the boot
+sequence, sets the Pi back to booting to `graphical.target` with its display manager enabled, and
+unmasks PipeWire. **That last one matters.** The installer masks PipeWire so it cannot claim the
+FLX4, and if you restore the desktop without undoing it you get a desktop with no sound at all.
+Each step is checked and reported, so you can see what actually took effect.
+
+Nothing is deleted. The chroot, the scripts, the udev rules and the service all stay where they are.
+
+**Go back to the player** whenever you like:
+
+```bash
+cd ~/rx3-handoff && ./install.sh && sudo systemctl enable --now rx3
+```
+
+**Note on SSH.** Stopping the player does not give you a desktop by itself, because the installer set
+the Pi to boot to a console. Until you run `./install.sh desktop`, the screen returns to a text
+login, not to the desktop.
+
+---
+
 # Running on a Raspberry Pi 3B+
 
 Everything here was developed and verified on a **Pi 5**. The scripts are board-agnostic and the

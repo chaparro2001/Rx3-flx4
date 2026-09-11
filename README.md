@@ -65,6 +65,9 @@ python3 recover-firmware.py && python3 extract_cramfs.py   # you supply the firm
 sudo systemctl enable --now rx3
 ```
 
+To stop the player and hand the Pi back to its desktop, run `./install.sh desktop`. That also
+unmasks PipeWire, without which the desktop comes back silent.
+
 `./install.sh doctor` is the thing to run whenever something is unclear: it reports every
 prerequisite as ok or missing, names the apt package or the script that fixes each one, and
 changes nothing.
