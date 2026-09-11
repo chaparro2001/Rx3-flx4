@@ -1,8 +1,9 @@
 #!/bin/bash
 # Install the host-side pieces of the RX3 player: helper binaries, udev rules, systemd unit.
 # Run from the directory this file lives in, as a normal user (it will ask for sudo).
-#   ./install.sh          full install
+#   ./install.sh deps     install the Debian packages this needs
 #   ./install.sh doctor   check prerequisites only, change nothing
+#   ./install.sh          full install (binaries, udev rules, systemd unit)
 set -uo pipefail
 . "$(dirname "$(readlink -f "$0")")/rx3-env.sh"
 ok(){ printf '  \033[32mok\033[0m   %s\n' "$1"; }
@@ -17,24 +18,72 @@ echo "  chroot  $RX3_ROOT"
 echo "  overlays $RX3_USB"
 echo
 
-if [ "$RX3_UID" -lt 1000 ] && [ -z "${RX3_ALLOW_SYSTEM_USER:-}" ]; then
-  bad "this directory is owned by '$RX3_USER', a system account - run: sudo chown -R \$(id -un):\$(id -gn) $RX3_HOME"
-fi
+case "$RX3_USERHOME" in
+  ''|/|/root|/nonexistent|/usr/sbin|/bin|/dev/null)
+    [ -z "${RX3_ALLOW_SYSTEM_USER:-}" ] && bad "owned by '$RX3_USER', whose home is $RX3_USERHOME - run: sudo chown -R \$(id -un):\$(id -gn) \"$RX3_HOME\"";;
+esac
 
 echo "Prerequisites"
+# Binary name -> apt package, because several differ (arm-linux-gnueabi-gcc lives in
+# gcc-arm-linux-gnueabi, 7z in p7zip-full) and that trips people up.
+pkg_for(){ case "$1" in
+  fuse-overlayfs) echo fuse-overlayfs;;
+  rsync) echo rsync;;
+  gcc) echo build-essential;;
+  arm-linux-gnueabi-gcc) echo gcc-arm-linux-gnueabi;;
+  python3) echo python3;;
+  uhubctl) echo uhubctl;;
+  7z) echo p7zip-full;;
+  *) echo "$1";;
+esac; }
 # sbin is not on a normal user's PATH, so look there too before declaring something missing.
 have(){ command -v "$1" >/dev/null || [ -x /usr/sbin/"$1" ] || [ -x /sbin/"$1" ]; }
-for p in fuse-overlayfs rsync gcc arm-linux-gnueabi-gcc python3; do
-  have $p && ok "$p" || bad "$p not installed"
-done
-have uhubctl && ok "uhubctl" || warn "uhubctl missing (only used to power-cycle a stuck FLX4)"
-python3 -c "import PIL" 2>/dev/null && ok "python3 PIL" || warn "python3-pil missing (screenshot helpers only)"
-[ -d "$RX3_HOME/extracted/runtime-files" ] && ok "extracted/runtime-files" || bad "extracted/runtime-files missing - run recover-firmware.py then extract_cramfs.py"
-[ -f "$RX3_HOME/runtime-symlinks.json" ] && ok "runtime-symlinks.json" || bad "runtime-symlinks.json missing - run extract_cramfs.py"
-[ -f "$RX3_HOME/extracted/player/pdj/rbp" ] && ok "recovered player binary" || bad "extracted/player/pdj/rbp missing - run recover-firmware.py"
+MISSING=""
+need(){ have "$1" && ok "$1" || { bad "$1 not installed (apt package: $(pkg_for "$1"))"; MISSING="$MISSING $(pkg_for "$1")"; }; }
+optional(){ have "$1" && ok "$1" || { warn "$1 missing - $2 (apt package: $(pkg_for "$1"))"; MISSING="$MISSING $(pkg_for "$1")"; }; }
+
+for p in fuse-overlayfs rsync gcc arm-linux-gnueabi-gcc python3; do need $p; done
+optional uhubctl "only used to power-cycle a stuck FLX4"
+python3 -c "import PIL" 2>/dev/null && ok "python3 PIL" || { warn "python3-pil missing (screenshot helpers)"; MISSING="$MISSING python3-pil"; }
+python3 -c "import cryptography" 2>/dev/null && ok "python3 cryptography" || { warn "python3-cryptography missing (needed by recover-firmware.py)"; MISSING="$MISSING python3-cryptography"; }
+have 7z || have bsdtar || { warn "7z missing (needed by recover-firmware.py to unpack the ISO)"; MISSING="$MISSING p7zip-full"; }
+echo
+
+echo "Recovered firmware"
+RF="$RX3_HOME/extracted/runtime-files"
+NFILES=$( [ -d "$RF" ] && find "$RF" -type f 2>/dev/null | head -2000 | wc -l || echo 0 )
+if [ ! -d "$RF" ]; then
+  bad "extracted/runtime-files missing - run: python3 recover-firmware.py && python3 extract_cramfs.py"
+elif [ ! -f "$RX3_HOME/runtime-symlinks.json" ]; then
+  # extract_cramfs.py writes the symlink map last, so this exact pair means it was interrupted.
+  bad "extraction incomplete: runtime-files exists but runtime-symlinks.json does not"
+  echo "       extract_cramfs.py writes that file last, so it was interrupted or it failed." >&2
+  echo "       Re-run it and let it finish:  python3 extract_cramfs.py" >&2
+elif [ "$NFILES" -lt 100 ]; then
+  bad "extracted/runtime-files has only $NFILES files - re-run: python3 extract_cramfs.py"
+else
+  ok "extracted/runtime-files ($NFILES+ files)"
+  ok "runtime-symlinks.json"
+fi
+[ -f "$RX3_HOME/extracted/player/pdj/rbp" ] && ok "recovered player binary" || bad "extracted/player/pdj/rbp missing - run: python3 recover-firmware.py"
 [ -d "$RX3_ROOT/root/pdj" ] && ok "chroot built" || warn "chroot not built yet - run ./build-rootfs.sh"
 echo
 
+if [ -n "$MISSING" ]; then
+  echo "Install what is missing with:"
+  echo "  sudo apt install -y $(echo $MISSING | tr ' ' '\n' | sort -u | tr '\n' ' ' | sed 's/ *$//')"
+  echo "  (or just run: ./install.sh deps)"
+  echo
+fi
+
+if [ "${1:-}" = deps ]; then
+  echo "== installing packages"
+  sudo apt update
+  sudo apt install -y fuse-overlayfs uhubctl exfatprogs alsa-utils python3-pil python3-cryptography \
+                      gcc build-essential gcc-arm-linux-gnueabi rsync p7zip-full || exit 1
+  echo "Done. Now run: ./install.sh doctor"
+  exit 0
+fi
 if [ "${1:-}" = doctor ]; then
   [ $FAIL -eq 0 ] && echo "All prerequisites present." || echo "Fix the MISS lines above, then re-run."
   exit $FAIL

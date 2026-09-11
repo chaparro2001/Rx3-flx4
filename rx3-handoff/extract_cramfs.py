@@ -6,7 +6,11 @@ import struct
 import zlib
 
 base = pathlib.Path(__file__).resolve().parent
-data = (base / 'extracted/update/images/rootfs.cramfs').read_bytes()
+src = base / 'extracted/update/images/rootfs.cramfs'
+if not src.exists():
+    raise SystemExit(f'{src} not found.\nRun recover-firmware.py first: it downloads and decrypts the '
+                     'official firmware and produces that file.')
+data = src.read_bytes()
 target = base / 'extracted/runtime-files'
 magic, length, flags = struct.unpack_from('<III', data)
 assert magic == 0x28cd3d45 and not flags & 0x800
@@ -43,12 +47,22 @@ def walk(pos, path):
             walk(entry, path / name)
             entry += 12 + nlen
     elif stat.S_ISREG(mode):
+        # Firmware files carry their original modes, many of them read-only (0o555), so writing over
+        # a previous extraction would fail with EACCES. Remove first: this script must be re-runnable,
+        # because an interrupted run is the most likely way anyone ends up back here.
+        dest.unlink(missing_ok=True)
         dest.write_bytes(contents(size, offset))
         dest.chmod(mode & 0o777)
         count += 1
     elif stat.S_ISLNK(mode):
         links[str(path)] = contents(size, offset).decode()
 
+source = base / 'extracted/update/images/rootfs.cramfs'
 walk(64, pathlib.Path())
-(base / 'runtime-symlinks.json').write_text(json.dumps(links, indent=2))
+# Written last and atomically: its presence is what tells install.sh the extraction actually finished.
+out = base / 'runtime-symlinks.json'
+tmp = out.with_suffix('.json.partial')
+tmp.write_text(json.dumps(links, indent=2))
+tmp.replace(out)
 print(f'Extracted {count} regular files; recorded {len(links)} symlinks; skipped device nodes.')
+print(f'Wrote {out}. Extraction complete.')

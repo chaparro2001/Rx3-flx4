@@ -3,24 +3,31 @@
 Run every command **on the Raspberry Pi**, as your normal login user. Nothing here needs a
 particular username: the scripts work out where they live and which account owns them.
 
-## 0. Packages
-
-```bash
-sudo apt update
-sudo apt install -y fuse-overlayfs uhubctl exfatprogs alsa-utils python3-pil \
-                    gcc build-essential gcc-arm-linux-gnueabi rsync p7zip-full python3-cryptography
-```
-
-## 1. Get the files onto the Pi
+## 1. Get the files and the packages
 
 ```bash
 git clone https://github.com/mutlisensor/Rx3-flx4.git
-cp -r Rx3-flx4/rx3-handoff ~/rx3-handoff
-chmod +x ~/rx3-handoff/*.sh
-cd ~/rx3-handoff
+cd Rx3-flx4/rx3-handoff
+chmod +x *.sh
+./install.sh deps          # installs every Debian package this needs
 ```
 
-Everything from here on runs inside `~/rx3-handoff`.
+Do not use `sudo` for the clone or the copy. The files must be owned by your own account, because
+that is how the scripts work out where to build the chroot.
+
+You can run everything from the clone, as above, or copy `rx3-handoff` somewhere more permanent
+such as `~/rx3-handoff` and work there. Either is fine.
+
+If you prefer to install the packages yourself instead of `./install.sh deps`:
+
+```bash
+sudo apt update
+sudo apt install -y fuse-overlayfs uhubctl exfatprogs alsa-utils python3-pil python3-cryptography \
+                    gcc build-essential gcc-arm-linux-gnueabi rsync p7zip-full
+```
+
+Note that two of these are not named after the command they provide: the `arm-linux-gnueabi-gcc`
+compiler comes from **`gcc-arm-linux-gnueabi`**, and `7z` comes from **`p7zip-full`**.
 
 ## 2. Recover the firmware
 
@@ -91,6 +98,22 @@ appears on the display. A USB mouse works as a pointer until you attach a touchs
 
 **"I ran recover-firmware.py and extract_cramfs.py — what now?"**
 `./install.sh doctor`, then `./build-rootfs.sh`, then `./install.sh`. In that order.
+
+**"extraction incomplete: runtime-files exists but runtime-symlinks.json does not"**
+`extract_cramfs.py` was interrupted or it failed. It writes the symlink map as its very last step,
+so that pair of symptoms means it never reached the end. Run it again:
+
+```bash
+python3 extract_cramfs.py
+```
+
+It must finish with `Extraction complete.` If it does not, the run did not count.
+
+**`PermissionError: ... extracted/runtime-files/bin/bashbug`** (or any other file there)
+A bug in older copies of `extract_cramfs.py`: firmware files are written with their original
+read-only modes, so a second run could not overwrite them, and every retry after an interruption
+failed at the same place. Pull the latest version and run it again. If you would rather not pull,
+`rm -rf extracted/runtime-files` first and the old script will get through.
 
 **"A script made `~/rx3-rootfs` but there is nothing inside it."**
 `extracted/runtime-files/` was missing or empty when `build-rootfs.sh` ran, so there was nothing to

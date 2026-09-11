@@ -55,13 +55,19 @@ in `rx3-handoff/extracted/` and `build-rootfs.sh` will assemble the chroot from 
 Full steps are in **[`INSTALL.md`](INSTALL.md)**. In short, on the Pi:
 
 ```bash
-cp -r Rx3-flx4/rx3-handoff ~/rx3-handoff && cd ~/rx3-handoff && chmod +x *.sh
+git clone https://github.com/mutlisensor/Rx3-flx4.git   # not with sudo: you must own these files
+cd Rx3-flx4/rx3-handoff && chmod +x *.sh
+./install.sh deps                                       # Debian packages
 python3 recover-firmware.py && python3 extract_cramfs.py   # you supply the firmware
-./install.sh doctor                                        # checks prerequisites, changes nothing
-./build-rootfs.sh                                          # assembles the chroot
-./install.sh                                               # udev rules, systemd unit, helper binaries
+./install.sh doctor                                     # checks prerequisites, changes nothing
+./build-rootfs.sh                                       # assembles the chroot
+./install.sh                                            # udev rules, systemd unit, helper binaries
 sudo systemctl enable --now rx3
 ```
+
+`./install.sh doctor` is the thing to run whenever something is unclear: it reports every
+prerequisite as ok or missing, names the apt package or the script that fixes each one, and
+changes nothing.
 
 No username is baked in. `rx3-env.sh` and `rx3_env.py` resolve every path from where the scripts
 live and who owns them, and each one can be overridden with an `RX3_*` environment variable.
