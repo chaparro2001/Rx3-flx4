@@ -1,0 +1,21 @@
+# Pioneer firmware and vendor material — never commit these.
+# See README.md "Firmware is not included" for how to recover them locally.
+rx3-handoff/extracted/
+rx3-handoff/pi-runtime/
+rx3-handoff/firmware/
+rx3-handoff/*.UPD
+rx3-handoff/XDJ-RX3_*.zip
+rx3-handoff/official-source-*.zip
+rx3-handoff/rbp
+rx3-handoff/rbp-pi
+rx3-handoff/aes256.key
+
+# Build output and local artefacts
+rx3-handoff/build/
+rx3-handoff/__pycache__/
+host/bin/
+*.o
+*.so
+*.log
+*.png
+.DS_Store

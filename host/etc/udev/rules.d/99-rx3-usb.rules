@@ -1,0 +1,3 @@
+# Hot-plugged USB storage partitions are presented to the RX3 player as USB1 via a copy-on-write overlay.
+ACTION=="add", SUBSYSTEM=="block", ENV{ID_BUS}=="usb", ENV{DEVTYPE}=="partition", ENV{ID_FS_TYPE}!="", RUN+="/bin/sh -c '/usr/bin/systemd-run --no-block /home/rx3/rx3-handoff/usb-hotplug.sh add %E{DEVNAME}'"
+ACTION=="remove", SUBSYSTEM=="block", ENV{DEVTYPE}=="partition", RUN+="/bin/sh -c '/usr/bin/systemd-run --no-block /home/rx3/rx3-handoff/usb-hotplug.sh remove %E{DEVNAME}'"

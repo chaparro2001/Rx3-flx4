@@ -1,0 +1,66 @@
+#include <stdint.h>
+#include <stdlib.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <sys/mman.h>
+#include <sys/ioctl.h>
+#include <linux/fb.h>
+#include <stdio.h>
+#include <string.h>
+#include <ft2build.h>
+#include FT_FREETYPE_H
+#include "pi-controls.h"
+static uint32_t frame[1920*1200],chrome[1920*1200];
+static FT_Face face;
+static void box(int x,int y,int w,int h,uint32_t c){for(int yy=y;yy<y+h;yy++)for(int xx=x;xx<x+w;xx++)if(xx>=0&&xx<1920&&yy>=0&&yy<1200)frame[yy*1920+xx]=c;}
+static void label(int cx,int cy,const char *s,int size,uint32_t c){
+ FT_Set_Pixel_Sizes(face,0,size);int w=0;for(const char*p=s;*p;p++){FT_Load_Char(face,*p,FT_LOAD_RENDER);w+=face->glyph->advance.x>>6;}
+ int x=cx-w/2;for(const char*p=s;*p;p++){if(FT_Load_Char(face,*p,FT_LOAD_RENDER))continue;FT_GlyphSlot g=face->glyph;
+ for(unsigned y=0;y<g->bitmap.rows;y++)for(unsigned i=0;i<g->bitmap.width;i++){
+ int px=x+g->bitmap_left+i,py=cy+size/3-g->bitmap_top+y;unsigned a=g->bitmap.buffer[y*g->bitmap.pitch+i];
+ if(px<0||px>=1920||py<0||py>=1200||!a)continue;uint32_t old=frame[py*1920+px],v=0;
+ for(int k=0;k<3;k++){unsigned shift=k*8;v|=((((c>>shift)&255)*a+((old>>shift)&255)*(255-a))/255)<<shift;}frame[py*1920+px]=v;
+ }x+=g->advance.x>>6;}
+}
+static void drawbutton(int i,int down){int x=(i%6)*320,y=1000+(i/6)*100;box(x+4,y+4,312,92,down?0x536f84:buttons[i].color);label(x+160,y+50,buttons[i].label,26,0xffffff);}
+int main(int argc,char**argv){
+ if(argc<2)return 2;
+ int src=open(argv[1],O_RDONLY),dst=open("/dev/fb0",O_RDWR);if(src<0||dst<0){perror("open");return 1;}
+ struct fb_fix_screeninfo f;struct fb_var_screeninfo v;ioctl(dst,FBIOGET_FSCREENINFO,&f);ioctl(dst,FBIOGET_VSCREENINFO,&v);
+ if(v.bits_per_pixel!=32&&v.bits_per_pixel!=16){fprintf(stderr,"Need a 16- or 32-bit framebuffer (got %u bpp)\n",v.bits_per_pixel);return 1;}
+ int bpp16=v.bits_per_pixel==16;
+ int W=v.xres,H=v.yres,portrait=H>W;
+ /* Map every physical pixel to the 1920x1200 logical canvas: fit with letterboxing, rotated 90 degrees on portrait panels. */
+ int lw=portrait?1200:1920,lh=portrait?1920:1200;double sc=W*1.0/lw<H*1.0/lh?W*1.0/lw:H*1.0/lh;
+ int dw=(int)(lw*sc),dh=(int)(lh*sc),ox=(W-dw)/2,oy=(H-dh)/2;
+ int *xm=malloc(sizeof(int)*W),*ym=malloc(sizeof(int)*H);
+ for(int px=0;px<W;px++)xm[px]=(px<ox||px>=ox+dw)?-1:(int)((px-ox)/sc);
+ for(int py=0;py<H;py++)ym[py]=(py<oy||py>=oy+dh)?-1:(int)((py-oy)/sc);
+ fprintf(stderr,"presenter: fb %dx%d %s, canvas %dx%d at %d,%d\n",W,H,portrait?"portrait":"landscape",dw,dh,ox,oy);
+ uint32_t *s=mmap(0,1280*800*4,PROT_READ,MAP_SHARED,src,0);unsigned char *d=mmap(0,f.smem_len,PROT_READ|PROT_WRITE,MAP_SHARED,dst,0);if(s==MAP_FAILED||d==MAP_FAILED)return 1;
+ int sf=open(UI_STATE,O_RDWR|O_CREAT,0600);if(sf<0||ftruncate(sf,sizeof(struct ui_state)))return 1;
+ struct ui_state *state=mmap(0,sizeof(*state),PROT_READ|PROT_WRITE,MAP_SHARED,sf,0);if(state==MAP_FAILED)return 1;
+ if(state->magic!=0x52583332){*state=(struct ui_state){0x52583332,{1,.6,0,1,.5,.5},0,1};}
+ FT_Library ft;if(FT_Init_FreeType(&ft)||FT_New_Face(ft,"/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",0,&face))return 1;
+ box(0,0,1920,1200,0x101820);for(int i=0;i<12;i++)drawbutton(i,0);
+ for(int i=0;i<6;i++){int x=i<3?0:1760,y=(i%3)*333;label(x+80,y+27,slider_names[i],23,0xffffff);}
+ memcpy(chrome,frame,sizeof(frame));
+ for(;;){
+ memcpy(frame,chrome,sizeof(frame));
+ for(int y=0;y<1000;y++){int sy=y*4/5;for(int x=0;x<1600;x++)frame[y*1920+x+160]=s[sy*1280+x*4/5];}
+ for(int i=0;i<12;i++)if(state->pressed&(1u<<i))drawbutton(i,1);
+ if(state->cursor_visible){int cx=state->cursor_x,cy=state->cursor_y;   /* arrow pointer: black outline, white fill */
+  for(int y=0;y<22;y++)for(int x=0;x<=y&&x<16;x++){int px=cx+x,py=cy+y;if(px<0||px>=1920||py<0||py>=1200)continue;
+   int edge=(x==0||x==y||y==21||x==15);frame[py*1920+px]=edge?0x000000:0xffffff;}}
+ for(int i=0;i<6;i++){int x=i<3?0:1760,y=(i%3)*333;float n=state->level[i];if(n<0)n=0;if(n>1)n=1;
+ box(x+70,y+85,20,180,0x35434e);int h=(int)(180*n);box(x+70,y+265-h,20,h,0x199feb);box(x+30,y+257-h,100,16,0xeaf3fa);
+ if(i==0||i==3){unsigned bit=i==0?1:2;box(x+8,y+43,144,32,state->headphone_cue&bit?0x126db0:0x35434e);label(x+80,y+60,"HP CUE",19,0xffffff);}
+ char val[24];snprintf(val,sizeof(val),"%d%%",(int)(n*100+.5));label(x+80,y+305,val,25,0xd1dae2);}
+ for(int py=0;py<H;py++){int ly=ym[py];unsigned char *line=d+py*f.line_length;
+  if(bpp16){uint16_t*row=(uint16_t*)line;for(int px=0;px<W;px++){int lx=xm[px];if(lx<0||ly<0){row[px]=0;continue;}
+   uint32_t c=portrait?frame[(1199-lx)*1920+ly]:frame[ly*1920+lx];row[px]=(uint16_t)(((c>>8)&0xf800)|((c>>5)&0x07e0)|((c>>3)&0x001f));}}
+  else{uint32_t*row=(uint32_t*)line;for(int px=0;px<W;px++){int lx=xm[px];if(lx<0||ly<0){row[px]=0;continue;}
+   row[px]=portrait?frame[(1199-lx)*1920+ly]:frame[ly*1920+lx];}}}
+ usleep(33333);
+ }
+}
