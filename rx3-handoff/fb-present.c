@@ -41,7 +41,28 @@ int main(int argc,char**argv){
  int sf=open(UI_STATE,O_RDWR|O_CREAT,0600);if(sf<0||ftruncate(sf,sizeof(struct ui_state)))return 1;
  struct ui_state *state=mmap(0,sizeof(*state),PROT_READ|PROT_WRITE,MAP_SHARED,sf,0);if(state==MAP_FAILED)return 1;
  if(state->magic!=0x52583332){*state=(struct ui_state){0x52583332,{1,.6,0,1,.5,.5},0,1};}
- FT_Library ft;if(FT_Init_FreeType(&ft)||FT_New_Face(ft,"/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",0,&face))return 1;
+ /* Any scalable sans will do. Try the usual Debian/Raspbian packages in turn rather than depending on
+    one font package, and say which paths were tried instead of exiting silently. $RX3_FONT overrides. */
+ static const char *fonts[]={
+  "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+  "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+  "/usr/share/fonts/truetype/freefont/FreeSans.ttf",
+  "/usr/share/fonts/truetype/piboto/Piboto-Regular.ttf",
+  "/usr/share/fonts/truetype/crosextra/Carlito-Regular.ttf",0};
+ FT_Library ft;
+ if(FT_Init_FreeType(&ft)){fprintf(stderr,"rx3-fb-present: cannot initialise FreeType\n");return 1;}
+ const char *chosen=getenv("RX3_FONT");
+ if(!chosen||FT_New_Face(ft,chosen,0,&face)){
+  chosen=0;
+  for(int i=0;fonts[i];i++) if(!FT_New_Face(ft,fonts[i],0,&face)){chosen=fonts[i];break;}
+ }
+ if(!chosen){
+  fprintf(stderr,"rx3-fb-present: no usable font found. Install one with:\n"
+                 "  sudo apt install fonts-dejavu-core\n"
+                 "Or point RX3_FONT at a .ttf. Looked for:\n");
+  for(int i=0;fonts[i];i++) fprintf(stderr,"  %s\n",fonts[i]);
+  return 1;
+ }
  box(0,0,1920,1200,0x101820);for(int i=0;i<12;i++)drawbutton(i,0);
  for(int i=0;i<6;i++){int x=i<3?0:1760,y=(i%3)*333;label(x+80,y+27,slider_names[i],23,0xffffff);}
  memcpy(chrome,frame,sizeof(frame));

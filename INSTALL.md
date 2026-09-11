@@ -23,7 +23,8 @@ If you prefer to install the packages yourself instead of `./install.sh deps`:
 ```bash
 sudo apt update
 sudo apt install -y fuse-overlayfs uhubctl exfatprogs alsa-utils python3-pil python3-cryptography \
-                    gcc build-essential gcc-arm-linux-gnueabi rsync p7zip-full
+                    gcc build-essential gcc-arm-linux-gnueabi rsync p7zip-full \
+                    libfreetype6-dev pkg-config fonts-dejavu-core
 ```
 
 Note that two of these are not named after the command they provide: the `arm-linux-gnueabi-gcc`
@@ -177,6 +178,28 @@ root's home instead of yours. Fix it with:
 ```bash
 sudo chown -R $(id -un):$(id -gn) ~/rx3-handoff
 ```
+
+**`fatal error: ft2build.h: No such file or directory`**
+The on-screen labels are drawn with FreeType, so the presenter needs its headers to build:
+
+```bash
+sudo apt install libfreetype6-dev pkg-config
+```
+
+Then run `./install.sh` again. `./install.sh deps` installs this for you.
+
+**Nothing on screen, and the log says `no /dev/fb0`**
+The framebuffer is created at boot only if a display was connected then, and it does not appear on
+hotplug. Connect the HDMI display and reboot. Check what the kernel sees with:
+
+```bash
+cat /sys/class/drm/card*/card*-HDMI*/status     # should say "connected"
+```
+
+**The display stays black and `rx3-fb-present` exits immediately**
+It needs a TrueType font and could not find one, which happens on a minimal Raspbian image. Install
+one with `sudo apt install fonts-dejavu-core`, or point `RX3_FONT` at a `.ttf` of your choosing. The
+presenter names the paths it tried when it fails.
 
 **Under-voltage warnings or the FLX4 not enumerating.** Use the official 27 W supply or a powered
 USB hub. The controller draws enough to brown out a Pi 5 on an underpowered supply.

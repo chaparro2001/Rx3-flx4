@@ -44,6 +44,18 @@ optional(){ have "$1" && ok "$1" || { warn "$1 missing - $2 (apt package: $(pkg_
 
 for p in fuse-overlayfs rsync gcc arm-linux-gnueabi-gcc python3; do need $p; done
 optional uhubctl "only used to power-cycle a stuck FLX4"
+if pkg-config --exists freetype2 2>/dev/null || [ -e /usr/include/freetype2/ft2build.h ]; then
+  ok "freetype headers"
+else
+  bad "FreeType headers missing, rx3-fb-present will not build (apt package: libfreetype6-dev)"
+  MISSING="$MISSING libfreetype6-dev pkg-config"
+fi
+if ls /usr/share/fonts/truetype/*/*.ttf >/dev/null 2>&1; then
+  ok "a TrueType font is installed"
+else
+  bad "no TrueType font found, rx3-fb-present needs one to draw labels (apt package: fonts-dejavu-core)"
+  MISSING="$MISSING fonts-dejavu-core"
+fi
 python3 -c "import PIL" 2>/dev/null && ok "python3 PIL" || { warn "python3-pil missing (screenshot helpers)"; MISSING="$MISSING python3-pil"; }
 python3 -c "import cryptography" 2>/dev/null && ok "python3 cryptography" || { warn "python3-cryptography missing (needed by recover-firmware.py)"; MISSING="$MISSING python3-cryptography"; }
 have 7z || have bsdtar || { warn "7z missing (needed by recover-firmware.py to unpack the ISO)"; MISSING="$MISSING p7zip-full"; }
@@ -80,7 +92,8 @@ if [ "${1:-}" = deps ]; then
   echo "== installing packages"
   sudo apt update
   sudo apt install -y fuse-overlayfs uhubctl exfatprogs alsa-utils python3-pil python3-cryptography \
-                      gcc build-essential gcc-arm-linux-gnueabi rsync p7zip-full || exit 1
+                      gcc build-essential gcc-arm-linux-gnueabi rsync p7zip-full \
+                      libfreetype6-dev pkg-config fonts-dejavu-core || exit 1
   echo "Done. Now run: ./install.sh doctor"
   exit 0
 fi
@@ -91,7 +104,11 @@ fi
 [ $FAIL -ne 0 ] && { echo "Prerequisites missing - fix the MISS lines above, then re-run."; exit 1; }
 
 echo "== helper binaries"
-gcc -O2 -DRX3_ROOT_PATH="\"$RX3_ROOT\"" -o "$RX3_BINDIR/rx3-fb-present" "$RX3_HOME/fb-present.c" || exit 1
+# fb-present draws its labels with FreeType, whose headers live under /usr/include/freetype2.
+FT_CFLAGS=$(pkg-config --cflags freetype2 2>/dev/null || echo -I/usr/include/freetype2)
+FT_LIBS=$(pkg-config --libs freetype2 2>/dev/null || echo -lfreetype)
+gcc -O2 -DRX3_ROOT_PATH="\"$RX3_ROOT\"" $FT_CFLAGS -o "$RX3_BINDIR/rx3-fb-present" "$RX3_HOME/fb-present.c" $FT_LIBS || {
+  echo "Building rx3-fb-present failed. It needs the FreeType headers:  sudo apt install libfreetype6-dev pkg-config" >&2; exit 1; }
 gcc -O2 -DRX3_ROOT_PATH="\"$RX3_ROOT\"" -o "$RX3_BINDIR/rx3-touch-bridge" "$RX3_HOME/touch-bridge.c" || exit 1
 ok "built rx3-fb-present and rx3-touch-bridge in $RX3_BINDIR"
 
