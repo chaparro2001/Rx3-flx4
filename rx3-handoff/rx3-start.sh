@@ -22,7 +22,13 @@ for wait in $(seq 1 30); do                       # the controller can enumerate
   for c in /proc/asound/card*/id; do grep -qE "FLX4|FLX6" $c 2>/dev/null && CARD=$(cat $c) && break; done
   [ -n "$CARD" ] && break
   # A bus-powered FLX4 often fails enumeration at power-on ("device not accepting address"); one port power-cycle usually fixes it.
-  [ $wait = 10 ] && command -v uhubctl >/dev/null && uhubctl -l 1 -a cycle -d 2 >/dev/null 2>&1
+  # Hub numbering differs per board (1 on a Pi 5, 1-1 on a 3B+), so ask uhubctl which hubs it can
+  # switch rather than naming one. Skipped once USB media is mounted, to avoid yanking a stick.
+  if [ $wait = 10 ] && command -v uhubctl >/dev/null && ! findmnt -rn -o TARGET | grep -q "^$R/media/"; then
+    for hub in $(uhubctl 2>/dev/null | sed -n 's/^Current status for hub \([^ ]*\).*/\1/p'); do
+      uhubctl -l "$hub" -a cycle -d 2 >/dev/null 2>&1
+    done
+  fi
   sleep 1
 done
 if [ -z "$CARD" ]; then

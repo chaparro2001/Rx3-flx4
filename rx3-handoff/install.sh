@@ -112,6 +112,12 @@ systemctl --user mask --now pipewire pipewire-pulse wireplumber pipewire.socket 
 ok "PipeWire masked for $RX3_USER"
 
 echo "== console: give the player the framebuffer"
+# The player draws straight to /dev/fb0, so a running desktop would fight it for the display.
+if [ "$(systemctl get-default)" != multi-user.target ]; then
+  echo "  This Pi currently boots to a desktop. The player needs the framebuffer to itself, so"
+  echo "  the desktop will be disabled and the Pi will boot to a console from now on."
+  echo "  To put it back later:  sudo systemctl set-default graphical.target && sudo systemctl enable lightdm"
+fi
 sudo systemctl set-default multi-user.target >/dev/null
 sudo systemctl disable lightdm >/dev/null 2>&1
 ok "booting to multi-user (no desktop)"

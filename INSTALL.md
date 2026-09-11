@@ -94,6 +94,34 @@ appears on the display. A USB mouse works as a pointer until you attach a touchs
 
 ---
 
+# Running on a Raspberry Pi 3B+
+
+Everything here was developed and verified on a **Pi 5**. The scripts are board-agnostic and the
+display presenter adapts to whatever resolution the screen reports, so a 3B+ should install and
+start the same way. What has **not** been tested on a 3B+ is whether it plays music well. Expect to
+find out, and expect these to be the limits:
+
+- **USB bandwidth is the real risk.** A 3B+ puts all four USB ports *and* Ethernet behind one shared
+  USB 2.0 controller. The FLX4 moves four channels of audio in and out over that same bus as the USB
+  stick the music streams from. Audio dropouts under load would not be surprising. Use Wi-Fi rather
+  than Ethernet to take one competitor off the bus.
+- **Power.** A bus-powered FLX4 on a 3B+ is asking a lot of the supply. Use a powered USB hub for
+  the controller. Under-voltage shows up as the controller failing to enumerate, or dropping out
+  mid-set.
+- **RAM.** A 3B+ has 1 GB, and the chroot mounts a 256 MB tmpfs. It fits, but do not expect to run a
+  desktop alongside it. The installer disables the desktop anyway.
+- **The interface may feel sluggish.** The presenter composites and scales a full frame in software
+  on the CPU.
+
+If audio breaks up, the first things to try are moving the USB stick to a powered hub, switching from
+Ethernet to Wi-Fi, and confirming the Pi is not reporting under-voltage:
+
+```bash
+vcgencmd get_throttled     # 0x0 is healthy; anything else means power trouble
+```
+
+---
+
 # Troubleshooting
 
 **"I ran recover-firmware.py and extract_cramfs.py — what now?"**
