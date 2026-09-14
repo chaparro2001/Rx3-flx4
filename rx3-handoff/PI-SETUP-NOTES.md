@@ -110,7 +110,8 @@ changing anything. Note that `uhubctl` lives in `/usr/sbin`, off a normal user's
 - **Player routing**: without the INPUT SELECT panel switches both mixer inputs were fed by player 1 (deck 2 inaudible,
   CH2 fader/EQ acting on deck 1). `control-shim.c` calls `djengine::DjEngineIF::setRoute(player, input)` (0x50598) with
   (0,0) and (1,1) five seconds after the crossfader assign. Verified by toggling each deck's play while metering each channel.
-- **Tempo slider key 0x4109 requires operation 5** (`PlayerInnards::onKey_TempoSlider` rejects anything else); analog
+- **Tempo slider key 0x4109 requires operation 5 and a signed analog**: -1 = full minus, 0 = centre, +1 = full plus (confirmed on screen: -0.5 shows -5.00 % with the 10 % range). The FLX4 fader sends 0 at the top, so the bridge sends (fader-0.5)*2. Note DjEngineIF::getTempoSlider reads back the magnitude for values between -1 and 0.
+- (old note) (`PlayerInnards::onKey_TempoSlider` rejects anything else); analog
   0.0 = -range (fader top), 1.0 = +range. Faders/EQ/trim accept op 4. `rx3-control.py tempo <deck> <0..1>` uses op 5.
 - **Switch-type keys use operation 5 with the value**: BeatEffectSW 0x448b (0 DELAY, 1 ECHO, 2 PING PONG, 3 SPIRAL, 4 HELIX,
   5 REVERB, 6 FLANGER, 7 PHASER, 8 FILTER, 9 TRANS, 10 ROLL, 11 SLIP ROLL, 12 PITCH, 13 VINYL BRAKE) and BfxChSW 0x448c

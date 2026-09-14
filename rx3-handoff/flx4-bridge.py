@@ -128,7 +128,10 @@ def cc(status, c, v):
         if c in DECK_CC_14: msb[(ch, c)] = v; return
         if c in (0x20,):                    # tempo LSB
             m = msb.get((ch, 0x00), 0); val = (m << 7 | v) / 16383.0
-            send(K['tempo'], 5, deck, 0, val); return            # op 5 only; FLX4 sends 0 at the top = -tempo, like the RX3 fader
+            # The engine's tempo slider is signed: -1 = full minus, 0 = centre, +1 = full plus (DjEngineIF::getTempoSlider
+            # reads back exactly what is sent). Feeding it the raw 0..1 fader made the centre detent +half range and the
+            # top 0 %. The FLX4 sends 0 at the top, which is the minus end, like the RX3's own fader.
+            send(K['tempo'], 5, deck, 0, (val - 0.5) * 2.0); return   # op 5 only
         if c in DECK_CC: analog(K[DECK_CC[c]], deck, v / 127.0); return
         if c in (0x24, 0x27, 0x2B, 0x2F, 0x33): return   # LSB echoes of the knobs, ignore
         if c in JOG_CC:
