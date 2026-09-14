@@ -105,6 +105,12 @@ are drawn.
 - **Touch Display 2** (7", DSI): detected by the firmware on a Pi 5 with nothing added to `config.txt`.
   It is a portrait panel (720x1280), so the interface is drawn rotated 90° into a 1152x720 landscape
   picture, and its Goodix touch controller is picked up automatically as the pointer.
+  **It needs its own power cable.** The FFC cable carries video, touch and the backlight control, but the
+  backlight is powered by the separate 3-pin lead to the GPIO header: red to pin 2 (5 V), black to pin 6
+  (GND). With the USB and Ethernet ports facing down, that is the top-right of the header, cable
+  vertical. Without it the Pi detects the panel and touch works, but the screen stays completely black
+  with no glow. Raspberry Pi warns that connecting this cable to the wrong pins can damage the display.
+  The FFC contacts face away from the display, towards the Ethernet/USB ports.
 - **Both connected**: the DSI panel is its own DRM device with its own `/dev/fbN`, so the scripts prefer it
   and HDMI is left alone. Put `RX3_FB=/dev/fb1` (or whichever) in `rx3.conf` to choose otherwise.
 
@@ -250,6 +256,10 @@ sudo apt install libfreetype6-dev pkg-config
 ```
 
 Then run `./install.sh` again. `./install.sh deps` installs this for you.
+
+**Touch Display 2 completely black, no backlight glow, touch works, `install.sh doctor` shows the display**
+The GPIO power lead is missing or loose. The kernel cannot tell: the touch controller and backlight
+control run from the FFC, only the backlight LEDs need the 5 V lead. See "Display" above.
 
 **Nothing on screen, and the log says `no /dev/fb0`**
 The framebuffer is created at boot only if a display was connected then, and it does not appear on
