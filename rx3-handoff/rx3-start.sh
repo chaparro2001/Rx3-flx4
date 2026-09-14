@@ -57,18 +57,20 @@ sleep 4
 if grep -q FLX4 /proc/asound/card*/id 2>/dev/null; then
   pgrep -f "^python3 $RX3_HOME/flx4-bridge" >/dev/null || nohup sudo -u $U env RX3_BRIDGE_LOG=1 python3 $H/flx4-bridge.py > $RX3_USERHOME/rx3-flx4.log 2>&1 < /dev/null &
 fi
-# /dev/fb0 only exists when a display was connected at boot: with nothing plugged in, the kernel
-# finds no CRTC and creates no framebuffer, so there is nothing for the presenter to draw on.
-if [ ! -e /dev/fb0 ]; then
-  echo "no /dev/fb0: the player is running but nothing can be shown."
-  echo "  Connect an HDMI display and reboot (the framebuffer is created at boot, not on hotplug)."
-  for c in /sys/class/drm/card*/card*-HDMI*; do
+# A framebuffer only exists for a display that was connected at boot: with nothing plugged in, the kernel
+# finds no CRTC and creates none, so there is nothing for the presenter to draw on. rx3-env.sh picks the
+# DSI touch panel when there is one, else the first framebuffer (RX3_FB overrides).
+if [ -z "$RX3_FB" ] || [ ! -e "$RX3_FB" ]; then
+  echo "no framebuffer: the player is running but nothing can be shown."
+  echo "  Connect a display (HDMI or the DSI touch panel) and reboot: framebuffers are created at boot, not on hotplug."
+  for c in /sys/class/drm/card*/card*-*; do
     [ -e "$c/status" ] && echo "  $(basename "$c"): $(cat "$c/status")"
   done
 elif [ ! -x $RX3_BINDIR/rx3-fb-present ]; then
   echo "rx3-fb-present is missing from $RX3_BINDIR: run ./install.sh to build it."
 else
-  pgrep -x rx3-fb-present >/dev/null || nohup sudo -u $U $RX3_BINDIR/rx3-fb-present $R/dev/fb0 > $RX3_USERHOME/rx3-present.log 2>&1 < /dev/null &
+  echo "display: $RX3_FB ($(cat /sys/class/graphics/$(basename $RX3_FB)/name 2>/dev/null) $(cat /sys/class/graphics/$(basename $RX3_FB)/virtual_size 2>/dev/null))${RX3_ROTATE:+ rotate=$RX3_ROTATE}"
+  pgrep -x rx3-fb-present >/dev/null || nohup sudo -u $U env RX3_FB="$RX3_FB" RX3_ROTATE="$RX3_ROTATE" RX3_FONT="${RX3_FONT:-}" $RX3_BINDIR/rx3-fb-present $R/dev/fb0 > $RX3_USERHOME/rx3-present.log 2>&1 < /dev/null &
 fi
 $H/input-hotplug.sh     # touchscreen if present, else USB mouse
 

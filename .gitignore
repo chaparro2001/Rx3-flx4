@@ -19,3 +19,5 @@ host/bin/
 *.log
 *.png
 .DS_Store
+# per-machine settings
+rx3-handoff/rx3.conf

@@ -32,11 +32,13 @@ int main(int argc,char**argv){
  int sf=open(UI_STATE,O_RDWR|O_CREAT,0600);if(sf<0||ftruncate(sf,sizeof(struct ui_state)))return 1;
  state=mmap(0,sizeof(*state),PROT_READ|PROT_WRITE,MAP_SHARED,sf,0);if(state==MAP_FAILED)return 1;
  if(state->magic!=0x52583332)*state=(struct ui_state){0x52583332,{1,.6,0,1,.5,.5},0,1};
- struct input_absinfo ax={.maximum=1199},ay={.maximum=1919};struct finger fingers[10]={0};
- int portrait=1;{int fb=open("/dev/fb0",O_RDONLY);if(fb>=0){struct fb_var_screeninfo v;if(!ioctl(fb,FBIOGET_VSCREENINFO,&v))portrait=v.yres>v.xres;close(fb);}}
- if(mouse||(replay&&!portrait)){portrait=0;ax.minimum=0;ax.maximum=1919;ay.minimum=0;ay.maximum=1199;}   /* mouse cursor / landscape replay live directly in the 1920x1200 canvas */
- fprintf(stderr,"touch bridge: %s mapping\n",portrait?"portrait (rotated)":"landscape");
- if(!replay&&!mouse&&(ioctl(in,EVIOCGABS(ABS_MT_POSITION_X),&ax)||ioctl(in,EVIOCGABS(ABS_MT_POSITION_Y),&ay))){perror("touch ranges");return 1;}
+ struct input_absinfo ax={.maximum=1919},ay={.maximum=1199};struct finger fingers[10]={0};
+ /* Same panel geometry and rotation as the presenter, so a touch lands exactly under what is drawn there. */
+ int W=1920,H=1200;{int fb=open(fb_device(),O_RDONLY);if(fb>=0){struct fb_var_screeninfo v;if(!ioctl(fb,FBIOGET_VSCREENINFO,&v)){W=v.xres;H=v.yres;}close(fb);}}
+ struct layout L=make_layout(W,H,rotation_for(W,H));
+ int direct=mouse||replay;   /* mouse cursor and replay input are already in 1920x1200 canvas coordinates */
+ if(!direct&&(ioctl(in,EVIOCGABS(ABS_MT_POSITION_X),&ax)||ioctl(in,EVIOCGABS(ABS_MT_POSITION_Y),&ay))){perror("touch ranges");return 1;}
+ fprintf(stderr,"touch bridge: %s, panel %dx%d rotate %d, canvas %dx%d at %d,%d, touch %d..%d x %d..%d\n",direct?"canvas input":"touchscreen",W,H,L.rot,L.dw,L.dh,L.ox,L.oy,ax.minimum,ax.maximum,ay.minimum,ay.maximum);
  if(mouse){fingers[0].x=960;fingers[0].y=600;state->cursor_x=960;state->cursor_y=600;state->cursor_visible=1;fprintf(stderr,"mouse mode: left=touch, wheel=browse, right=back, middle=enter\n");}
 
  int slot=0,source=-1,ux=0,uy=0,release=0;struct input_event e;struct pollfd p={in,POLLIN,0};
@@ -54,8 +56,8 @@ int main(int argc,char**argv){
  long now=millis();
  for(int i=0;i<10;i++){
   struct finger*f=&fingers[i];int lx,ly;
-  if(portrait){lx=(f->y-ay.minimum)*1920/(ay.maximum-ay.minimum+1);ly=1199-(f->x-ax.minimum)*1200/(ax.maximum-ax.minimum+1);}
-  else{lx=(f->x-ax.minimum)*1920/(ax.maximum-ax.minimum+1);ly=(f->y-ay.minimum)*1200/(ay.maximum-ay.minimum+1);}
+  if(direct){lx=f->x;ly=f->y;}
+  else{int px=(int)((long)(f->x-ax.minimum)*W/(ax.maximum-ax.minimum+1)),py=(int)((long)(f->y-ay.minimum)*H/(ay.maximum-ay.minimum+1));panel_to_canvas(&L,px,py,1,&lx,&ly);}
   if(lx<0)lx=0;if(lx>1919)lx=1919;if(ly<0)ly=0;if(ly>1199)ly=1199;
   if(f->down&&!f->active){f->active=1;f->region=-1;
    if(ly>=1000){f->region=1+(ly-1000)/100*6+lx/320;button(f->region-1,1);f->next_repeat=now+400;}

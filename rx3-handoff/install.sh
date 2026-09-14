@@ -17,6 +17,11 @@ echo "  tools   $RX3_HOME"
 echo "  user    $RX3_USER"
 echo "  chroot  $RX3_ROOT"
 echo "  overlays $RX3_USB"
+if [ -n "$RX3_FB" ] && [ -e "$RX3_FB" ]; then
+  echo "  display $RX3_FB ($(cat /sys/class/graphics/$(basename $RX3_FB)/name 2>/dev/null), $(cat /sys/class/graphics/$(basename $RX3_FB)/virtual_size 2>/dev/null | tr , x) px)${RX3_ROTATE:+ rotate=$RX3_ROTATE}"
+else
+  echo "  display none yet (connect HDMI or the DSI touch panel and reboot)"
+fi
 echo
 
 case "$RX3_USERHOME" in

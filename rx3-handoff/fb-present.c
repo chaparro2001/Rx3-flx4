@@ -25,18 +25,16 @@ static void label(int cx,int cy,const char *s,int size,uint32_t c){
 static void drawbutton(int i,int down){int x=(i%6)*320,y=1000+(i/6)*100;box(x+4,y+4,312,92,down?0x536f84:buttons[i].color);label(x+160,y+50,buttons[i].label,26,0xffffff);}
 int main(int argc,char**argv){
  if(argc<2)return 2;
- int src=open(argv[1],O_RDONLY),dst=open("/dev/fb0",O_RDWR);if(src<0||dst<0){perror("open");return 1;}
+ const char*fbpath=argc>2?argv[2]:fb_device();
+ int src=open(argv[1],O_RDONLY),dst=open(fbpath,O_RDWR);if(src<0||dst<0){perror(src<0?argv[1]:fbpath);return 1;}
  struct fb_fix_screeninfo f;struct fb_var_screeninfo v;ioctl(dst,FBIOGET_FSCREENINFO,&f);ioctl(dst,FBIOGET_VSCREENINFO,&v);
  if(v.bits_per_pixel!=32&&v.bits_per_pixel!=16){fprintf(stderr,"Need a 16- or 32-bit framebuffer (got %u bpp)\n",v.bits_per_pixel);return 1;}
  int bpp16=v.bits_per_pixel==16;
- int W=v.xres,H=v.yres,portrait=H>W;
- /* Map every physical pixel to the 1920x1200 logical canvas: fit with letterboxing, rotated 90 degrees on portrait panels. */
- int lw=portrait?1200:1920,lh=portrait?1920:1200;double sc=W*1.0/lw<H*1.0/lh?W*1.0/lw:H*1.0/lh;
- int dw=(int)(lw*sc),dh=(int)(lh*sc),ox=(W-dw)/2,oy=(H-dh)/2;
- int *xm=malloc(sizeof(int)*W),*ym=malloc(sizeof(int)*H);
- for(int px=0;px<W;px++)xm[px]=(px<ox||px>=ox+dw)?-1:(int)((px-ox)/sc);
- for(int py=0;py<H;py++)ym[py]=(py<oy||py>=oy+dh)?-1:(int)((py-oy)/sc);
- fprintf(stderr,"presenter: fb %dx%d %s, canvas %dx%d at %d,%d\n",W,H,portrait?"portrait":"landscape",dw,dh,ox,oy);
+ int W=v.xres,H=v.yres,rot=rotation_for(W,H);struct layout L=make_layout(W,H,rot);
+ /* One canvas index per panel pixel (-1 in the letterbox), so the copy loop below is a plain lookup. */
+ int *idx=malloc(sizeof(int)*W*H);if(!idx)return 1;
+ for(int py=0;py<H;py++)for(int px=0;px<W;px++){int cx,cy;idx[py*W+px]=panel_to_canvas(&L,px,py,0,&cx,&cy)?cy*1920+cx:-1;}
+ fprintf(stderr,"presenter: %s %dx%d, rotate %d, canvas %dx%d at %d,%d\n",fbpath,W,H,rot,L.dw,L.dh,L.ox,L.oy);
  uint32_t *s=mmap(0,1280*800*4,PROT_READ,MAP_SHARED,src,0);unsigned char *d=mmap(0,f.smem_len,PROT_READ|PROT_WRITE,MAP_SHARED,dst,0);if(s==MAP_FAILED||d==MAP_FAILED)return 1;
  int sf=open(UI_STATE,O_RDWR|O_CREAT,0600);if(sf<0||ftruncate(sf,sizeof(struct ui_state)))return 1;
  struct ui_state *state=mmap(0,sizeof(*state),PROT_READ|PROT_WRITE,MAP_SHARED,sf,0);if(state==MAP_FAILED)return 1;
@@ -77,11 +75,10 @@ int main(int argc,char**argv){
  box(x+70,y+85,20,180,0x35434e);int h=(int)(180*n);box(x+70,y+265-h,20,h,0x199feb);box(x+30,y+257-h,100,16,0xeaf3fa);
  if(i==0||i==3){unsigned bit=i==0?1:2;box(x+8,y+43,144,32,state->headphone_cue&bit?0x126db0:0x35434e);label(x+80,y+60,"HP CUE",19,0xffffff);}
  char val[24];snprintf(val,sizeof(val),"%d%%",(int)(n*100+.5));label(x+80,y+305,val,25,0xd1dae2);}
- for(int py=0;py<H;py++){int ly=ym[py];unsigned char *line=d+py*f.line_length;
-  if(bpp16){uint16_t*row=(uint16_t*)line;for(int px=0;px<W;px++){int lx=xm[px];if(lx<0||ly<0){row[px]=0;continue;}
-   uint32_t c=portrait?frame[(1199-lx)*1920+ly]:frame[ly*1920+lx];row[px]=(uint16_t)(((c>>8)&0xf800)|((c>>5)&0x07e0)|((c>>3)&0x001f));}}
-  else{uint32_t*row=(uint32_t*)line;for(int px=0;px<W;px++){int lx=xm[px];if(lx<0||ly<0){row[px]=0;continue;}
-   row[px]=portrait?frame[(1199-lx)*1920+ly]:frame[ly*1920+lx];}}}
+ for(int py=0;py<H;py++){const int *m=idx+py*W;unsigned char *line=d+py*f.line_length;
+  if(bpp16){uint16_t*row=(uint16_t*)line;for(int px=0;px<W;px++){int i=m[px];if(i<0){row[px]=0;continue;}
+   uint32_t c=frame[i];row[px]=(uint16_t)(((c>>8)&0xf800)|((c>>5)&0x07e0)|((c>>3)&0x001f));}}
+  else{uint32_t*row=(uint32_t*)line;for(int px=0;px<W;px++){int i=m[px];row[px]=i<0?0:frame[i];}}}
  usleep(33333);
  }
 }

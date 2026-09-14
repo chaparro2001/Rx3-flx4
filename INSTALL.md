@@ -95,6 +95,34 @@ appears on the display. A USB mouse works as a pointer until you attach a touchs
 
 ---
 
+# Display: HDMI or the Raspberry Pi Touch Display 2
+
+Both work from the same install, with no configuration. The presenter reads the framebuffer's size and
+draws the interface to fit, and the touch bridge uses the same geometry so touches land where things
+are drawn.
+
+- **HDMI**: any resolution, 16 or 32 bpp. A USB mouse is the pointer unless a touchscreen is present.
+- **Touch Display 2** (7", DSI): detected by the firmware on a Pi 5 with nothing added to `config.txt`.
+  It is a portrait panel (720x1280), so the interface is drawn rotated 90° into a 1152x720 landscape
+  picture, and its Goodix touch controller is picked up automatically as the pointer.
+- **Both connected**: the DSI panel is its own DRM device with its own `/dev/fbN`, so the scripts prefer it
+  and HDMI is left alone. Put `RX3_FB=/dev/fb1` (or whichever) in `rx3.conf` to choose otherwise.
+
+Displays must be connected **at boot**; a framebuffer is not created on hotplug.
+
+**If the picture is upside down** for the way the panel is mounted, set the rotation. Create
+`rx3-handoff/rx3.conf` with one line and restart the service:
+
+```bash
+echo 'RX3_ROTATE=270' > ~/rx3-handoff/rx3.conf     # 0, 90, 180 or 270, clockwise
+sudo systemctl restart rx3
+```
+
+Portrait panels default to 90, landscape ones to 0. The touch mapping follows the same setting.
+`rx3.conf` is also where `RX3_FB` and `RX3_FONT` go; it is sourced by every script.
+
+---
+
 # Stopping the player, and getting the desktop back
 
 **Just stop it for now** (it will still start at the next boot):

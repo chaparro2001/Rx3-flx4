@@ -1,6 +1,25 @@
 # XDJ-RX3 firmware 1.19 on Raspberry Pi 5 (host `rx3`, user `rx3`) — setup notes, 2026-09-10
 
 
+
+## Display: Touch Display 2 (DSI) and HDMI
+
+- The Pi 5 firmware auto-detects the 7" Touch Display 2 (`display_auto_detect=1`, nothing added to
+  config.txt): connector `DSI-2` on `card0` (drm-rp1-dsi), native 720x1280 portrait, 32 bpp, its own
+  `/dev/fbN` (`drm-rp1-dsidrmf`) separate from the vc4 HDMI card. Touch is a Goodix GT911 on i2c-11,
+  `ID_INPUT_TOUCHSCREEN=1`, axes 0..719 x 0..1279 in panel orientation, type-B multitouch.
+- `rx3-env.sh` sets `RX3_FB` to the DSI framebuffer when one exists, else the first `/dev/fb*`;
+  `RX3_ROTATE` (0/90/180/270 clockwise) overrides the default of 90 for portrait panels, 0 for landscape.
+  Both go in the optional `rx3.conf`, which every script sources. Framebuffers exist only for displays
+  connected at boot.
+- `pi-controls.h` holds the one geometry used by both binaries (`make_layout`, `panel_to_canvas`): the
+  1920x1200 canvas is letterboxed and rotated onto the panel, and the touch bridge maps a touch through
+  the same table, so the earlier 10 % long-axis error (bridge mapped the full 1280 px while the picture
+  was 1152 px) is gone. Rotate 90 puts the canvas's left edge at the panel's top edge (turn the panel
+  anticlockwise to read it); 270 is the other way round.
+- On the TD2 the firmware UI ends up 960x600 px in a 1152x720 picture. `--replay` (rx3-tap.py) and
+  `--mouse` feed canvas coordinates directly, independent of the panel.
+
 ## Paths and identity are resolved, not hardcoded
 
 `rx3-env.sh` (shell) and `rx3_env.py` (Python) work out the layout at run time, so no username,

@@ -14,5 +14,5 @@ if [ -n "$touch" ]; then mode=""; dev=$touch; elif [ -n "$mouse" ]; then mode="-
 cur=$(pgrep -a -f "^$RX3_BINDIR/rx3-touch-bridge" | head -1)
 case "$cur" in *"$dev"*) exit 0;; esac          # already bridging this device
 pkill -f "^$RX3_BINDIR/rx3-touch-bridge"; sleep 0.5
-nohup sudo -u $RX3_USER $B $mode $dev $R/dev/tsc2007_2-0048 > $RX3_USERHOME/rx3-touch.log 2>&1 < /dev/null &
+nohup sudo -u $RX3_USER env RX3_FB="$RX3_FB" RX3_ROTATE="$RX3_ROTATE" $B $mode $dev $R/dev/tsc2007_2-0048 > $RX3_USERHOME/rx3-touch.log 2>&1 < /dev/null &
 logger -t rx3 "pointer bridge started: $mode $dev"
