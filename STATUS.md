@@ -7,8 +7,8 @@
 - Starts at boot through the `rx3` systemd service, bringing up display, bridges and USB media automatically.
 - USB mouse navigation with an on-screen cursor: left click = touch, wheel = browse selector, right = BACK, middle = ENTER.
   A touch panel is picked up automatically in preference to the mouse.
-- On-screen buttons: SOURCE, BROWSE, SHORTCUT, MENU / UTILITY (hold), BACK, UP/DOWN, ENTER, LOAD 1/2, PLAY/PAUSE 1/2,
-  USB STOP 1/2, plus KEYBOARD (see Work in progress). MENU verified on the player 2026-09-16.
+- On-screen buttons: SOURCE, BROWSE, SHORTCUT, UTILITY, BACK, UP/DOWN, ENTER, LOAD 1/2, PLAY/PAUSE 1/2, USB STOP 1/2,
+  plus KEYBOARD (see Work in progress). UTILITY verified on the player 2026-09-16.
 - Display profiles (`displays.py`: td2, hdmi1080, hdmi, custom) picked from the connected framebuffer; the interface is
   laid out on the panel itself (no letterbox), with `RX3_UI`, `RX3_UI_SCALE` and `RX3_TOUCH` in `rx3.conf` to adjust
   chrome and touch axes. Verified 2026-09-16 on a 1920x1080 HDMI touch panel: picture and touch right without any setting.
@@ -40,8 +40,6 @@
 - **KEYBOARD (0x216) does nothing** from the main screen. It sits among the firmware's touch-GUI keys (Shortcut,
   DeckInfoSelect, TouchPanelOn), so it probably only acts inside the SEARCH screen; to be checked, else the button
   should send SEARCH (0x205) instead.
-- **UTILITY by holding MENU / UTILITY** for over a second: the firmware times the hold itself (sending it its
-  "long-pressed" code just opened MENU). Verify the hold on the on-screen button opens the UTILITY screen.
 - **Unmapped pad modes**: pad FX, sampler, keyboard and key shift are not mapped, as the RX3 has no direct equivalent for most of them.
 - **Device names**: SOURCE shows USB1/USB2 rather than each stick's volume label.
 - **No auto-restart**: if the player process crashes the service does not restart it; `systemctl restart rx3` is needed.

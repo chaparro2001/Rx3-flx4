@@ -204,12 +204,11 @@ changing anything. Note that `uhubctl` lives in `/usr/sbin`, off a normal user's
   sticks in the background. Verified 2026-09-11 with simulated unplug/replug (`echo 0/1 > /sys/bus/usb/devices/<port>/authorized`):
   USB STOP -> pull -> re-insert relists the slot; surprise removal + re-insert too.
 - Key operation codes seen in handlers: Jog 4/0/1/5, Sync fires on release (2), AutoBeatLoop 1, BeatJumpLoopMove 3, Pad 1/3.
-- **Settings keys on the touch strip** (2026-09-16): SHORTCUT 0x210, KEYBOARD 0x216, MENU / UTILITY 0x206.
-  `keycodes.txt` has no utility key: on the RX3 the panel button is MENU/UTILITY (tap = MENU, held > 1 s = UTILITY).
-  First attempt sent press + the firmware's "long-pressed" code 1 + release: **on the player that just opened MENU**, so
-  the firmware times the hold itself, as it does for USB STOP, and code 1 is not the way in. The on-screen button is
-  therefore a plain press/release like every other, and the user holds it; `rx3-control.py utility` (= `hold menu`)
-  presses, waits 1.5 s, releases. Code 1 is never sent by us (it poisons a USB STOP slot, see above).
+- **Settings keys on the touch strip** (2026-09-16): SHORTCUT 0x210, KEYBOARD 0x216, UTILITY = MENU 0x206 with the
+  firmware's "long-pressed" code 1 right after the press, then release (`hold` in the button table; `rx3-control.py
+  utility` / `hold <key>` do the same from the shell). On the player this shows the same screen as a plain MENU tap,
+  which is the screen the user wants, so there is one UTILITY button and no separate MENU. Code 1 always follows a
+  press: on its own it poisons a USB STOP slot (see above), and `rx3-control.py hold usbstop` is refused.
   KEYBOARD 0x216 did nothing from the main screen; it is in the touch-GUI key block (Shortcut, DeckInfoSelect,
   TouchPanelOn), so it likely only works inside SEARCH - to check: `rx3-control.py search`, then `keyboard`. If it
   never does anything on its own, the button should send SEARCH 0x205. Still unmapped: Info 0x20b, TagList 0x203,

@@ -12,23 +12,22 @@
 struct command {int key,operation,channel,value;float analog;int extra;};
 struct ui_state {unsigned magic;float level[6];unsigned pressed;unsigned headphone_cue;int cursor_x,cursor_y,cursor_visible;};
 /* The button strip: BUTTON_ROWS rows of BUTTON_COLS cells under the content area. Cells past NBUTTONS stay empty.
-   `scroll` makes the button a repeating rotary step (the browse selector). Every other button is a plain press on
-   finger down and release on finger up: the firmware times its own holds, so MENU / UTILITY (0x206) behaves like the
-   panel button - a tap opens MENU, holding it for over a second opens UTILITY - and USB STOP ejects after ~1.9 s. */
+   `scroll` makes the button a repeating rotary step (the browse selector); `hold` adds the firmware's operation 1
+   ("long-pressed") right after the press - UTILITY is the panel's MENU key (0x206) held down. */
 #define BUTTON_COLS 8
 #define BUTTON_ROWS 2
 #define NBUTTONS 15
 /* `brief` is drawn instead of `label` when the cell is too narrow for the full text even at the smallest font. */
-struct button {const char *label,*brief;int key,channel,scroll;unsigned color;};
+struct button {const char *label,*brief;int key,channel,scroll,hold;unsigned color;};
 static const struct button buttons[NBUTTONS]={
- {"SOURCE",0,0x201,0,0,0x08699c},{"BROWSE",0,0x202,0,0,0x08699c},
- {"SHORTCUT",0,0x210,0,0,0x4b3a6d},{"KEYBOARD",0,0x216,0,0,0x4b3a6d},
- {"MENU / UTILITY (hold)","MENU",0x206,0,0,0x4b3a6d},{"BACK",0,0x420d,0,0,0x283542},
- {"UP",0,0x420c,0,-1,0x283542},{"DOWN",0,0x420c,0,1,0x283542},
- {"ENTER",0,0x420c,0,0,0x283542},
- {"LOAD 1",0,0x4311,1,0,0x08699c},{"USB STOP 1 (hold)","EJECT 1",0x8002,1,0,0x7a2f2f},
- {"PLAY / PAUSE 1","PLAY 1",0x4101,1,0,0x12623a},{"LOAD 2",0,0x4311,2,0,0x08699c},
- {"USB STOP 2 (hold)","EJECT 2",0x8002,2,0,0x7a2f2f},{"PLAY / PAUSE 2","PLAY 2",0x4101,2,0,0x12623a}
+ {"SOURCE",0,0x201,0,0,0,0x08699c},{"BROWSE",0,0x202,0,0,0,0x08699c},
+ {"SHORTCUT",0,0x210,0,0,0,0x4b3a6d},{"KEYBOARD",0,0x216,0,0,0,0x4b3a6d},
+ {"UTILITY",0,0x206,0,0,1,0x4b3a6d},{"BACK",0,0x420d,0,0,0,0x283542},
+ {"UP",0,0x420c,0,-1,0,0x283542},{"DOWN",0,0x420c,0,1,0,0x283542},
+ {"ENTER",0,0x420c,0,0,0,0x283542},
+ {"LOAD 1",0,0x4311,1,0,0,0x08699c},{"USB STOP 1 (hold)","EJECT 1",0x8002,1,0,0,0x7a2f2f},
+ {"PLAY / PAUSE 1","PLAY 1",0x4101,1,0,0,0x12623a},{"LOAD 2",0,0x4311,2,0,0,0x08699c},
+ {"USB STOP 2 (hold)","EJECT 2",0x8002,2,0,0,0x7a2f2f},{"PLAY / PAUSE 2","PLAY 2",0x4101,2,0,0,0x12623a}
 };
 static const char *slider_names[6]={"DECK 1","MASTER","HP MIX","DECK 2","HP LEVEL","CROSS"};
 static const int slider_keys[6]={0x501e,0x4403,0x4405,0x501e,0x4406,0x6017};
