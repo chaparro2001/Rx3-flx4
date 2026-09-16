@@ -213,7 +213,8 @@ changing anything. Note that `uhubctl` lives in `/usr/sbin`, off a normal user's
   TouchPanelOn, so it probably only means something inside a text-entry screen); the button sends SEARCH 0x205
   instead, which is what "keyboard" is for. Still unmapped: Info 0x20b, TagList 0x203, DeckInfoSelect 0x213, and
   Keyboard 0x216 itself.
-- The on-screen strip is now 2 rows of 8 cells (16 buttons). Geometry lives in `pi-controls.h`
+- The on-screen strip is 2 rows of 10 cells (row 1 navigation, row 2 the two decks: LOAD, USB STOP, PLAY, QUANTIZE
+  0x410b, MASTER TEMPO 0x4108, each on channel 1/2; an entry with no label is an empty cell). Geometry lives in `pi-controls.h`
   (`BUTTON_COLS/ROWS`, `button_rect`, `button_at`) and both the presenter and the touch bridge use it, so a layout
   change cannot make the drawn button and the touched button disagree. Labels shrink to fit their cell (26 px down to 15).
 - `rx3-deck.sh state|play|pause <deck>` — screen-verified deck helpers (only valid on the main screen, not the browser).

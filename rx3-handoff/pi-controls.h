@@ -11,12 +11,14 @@
 #define SRC_H 800
 struct command {int key,operation,channel,value;float analog;int extra;};
 struct ui_state {unsigned magic;float level[6];unsigned pressed;unsigned headphone_cue;int cursor_x,cursor_y,cursor_visible;};
-/* The button strip: BUTTON_ROWS rows of BUTTON_COLS cells under the content area. Cells past NBUTTONS stay empty.
+/* The button strip: BUTTON_ROWS rows of BUTTON_COLS cells under the content area. Row 1 is navigation, row 2 the two
+   decks. An entry with no label is an empty cell (drawn as background, touches ignored), as are cells past NBUTTONS.
    `scroll` makes the button a repeating rotary step (the browse selector); `hold` adds the firmware's operation 1
-   ("long-pressed") right after the press - UTILITY is the panel's MENU key (0x206) held down. */
-#define BUTTON_COLS 8
+   ("long-pressed") right after the press - UTILITY is the panel's MENU key (0x206) held down. QUANTIZE and MASTER
+   TEMPO are toggles whose state only the RX3's own deck display shows (the firmware reports no LED state to us). */
+#define BUTTON_COLS 10
 #define BUTTON_ROWS 2
-#define NBUTTONS 15
+#define NBUTTONS 20
 /* `brief` is drawn instead of `label` when the cell is too narrow for the full text even at the smallest font. */
 struct button {const char *label,*brief;int key,channel,scroll,hold;unsigned color;};
 static const struct button buttons[NBUTTONS]={
@@ -24,10 +26,11 @@ static const struct button buttons[NBUTTONS]={
  {"SHORTCUT",0,0x210,0,0,0,0x4b3a6d},{"SEARCH",0,0x205,0,0,0,0x4b3a6d},
  {"UTILITY",0,0x206,0,0,1,0x4b3a6d},{"BACK",0,0x420d,0,0,0,0x283542},
  {"UP",0,0x420c,0,-1,0,0x283542},{"DOWN",0,0x420c,0,1,0,0x283542},
- {"ENTER",0,0x420c,0,0,0,0x283542},
+ {"ENTER",0,0x420c,0,0,0,0x283542},{0,0,0,0,0,0,0},
  {"LOAD 1",0,0x4311,1,0,0,0x08699c},{"USB STOP 1 (hold)","EJECT 1",0x8002,1,0,0,0x7a2f2f},
- {"PLAY / PAUSE 1","PLAY 1",0x4101,1,0,0,0x12623a},{"LOAD 2",0,0x4311,2,0,0,0x08699c},
- {"USB STOP 2 (hold)","EJECT 2",0x8002,2,0,0,0x7a2f2f},{"PLAY / PAUSE 2","PLAY 2",0x4101,2,0,0,0x12623a}
+ {"PLAY / PAUSE 1","PLAY 1",0x4101,1,0,0,0x12623a},{"QUANTIZE 1","Q 1",0x410b,1,0,0,0x5a4a1f},{"MASTER TEMPO 1","MT 1",0x4108,1,0,0,0x5a4a1f},
+ {"LOAD 2",0,0x4311,2,0,0,0x08699c},{"USB STOP 2 (hold)","EJECT 2",0x8002,2,0,0,0x7a2f2f},
+ {"PLAY / PAUSE 2","PLAY 2",0x4101,2,0,0,0x12623a},{"QUANTIZE 2","Q 2",0x410b,2,0,0,0x5a4a1f},{"MASTER TEMPO 2","MT 2",0x4108,2,0,0,0x5a4a1f}
 };
 static const char *slider_names[6]={"DECK 1","MASTER","HP MIX","DECK 2","HP LEVEL","CROSS"};
 static const int slider_keys[6]={0x501e,0x4403,0x4405,0x501e,0x4406,0x6017};
@@ -79,7 +82,7 @@ static inline int button_at(const struct ui*u,int x,int y){
  if(u->sh==0||y<u->sy||y>=u->sy+u->sh)return -1;
  int row=0;while(row<BUTTON_ROWS-1&&y>=u->sy+(row+1)*u->sh/BUTTON_ROWS)row++;   /* same split as button_rect */
  for(int col=0;col<BUTTON_COLS;col++){int i=row*BUTTON_COLS+col,bx,by,bw,bh;if(i>=NBUTTONS)break;
-  button_rect(u,i,&bx,&by,&bw,&bh);if(x>=bx&&x<bx+bw)return i;}
+  button_rect(u,i,&bx,&by,&bw,&bh);if(x>=bx&&x<bx+bw)return buttons[i].label?i:-1;}
  return -1;}
 /* Slider i (0-2 left bar, 3-5 right bar) is drawn from a 160x333 design box: its origin and the scale that
    fits it, centred in its slot. Touch converts back through the same numbers. */

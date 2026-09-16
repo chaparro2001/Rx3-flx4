@@ -36,7 +36,7 @@ static const char *button_text(int i,int w,int *size){
  if(!text[i]){int room=w-PX(24),want=PX(26);text[i]=buttons[i].label;sizes[i]=fitsize(text[i],room,want);
   if(textwidth(text[i],sizes[i])>room&&buttons[i].brief){text[i]=buttons[i].brief;sizes[i]=fitsize(text[i],room,want);}}
  *size=sizes[i];return text[i];}
-static void drawbutton(const struct ui*u,int i,int down){int x,y,w,h,size;button_rect(u,i,&x,&y,&w,&h);
+static void drawbutton(const struct ui*u,int i,int down){int x,y,w,h,size;if(!buttons[i].label)return;button_rect(u,i,&x,&y,&w,&h);
  int m=PX(4);box(x+m,y+m,w-2*m,h-2*m,down?0x536f84:buttons[i].color);
  const char *t=button_text(i,w,&size);label(x+w/2,y+h/2,t,size,0xffffff);}
 /* Slider i from its 160x333 design box (slider_box gives the origin and scale; the touch bridge inverts the same numbers). */
