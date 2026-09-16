@@ -184,6 +184,20 @@ changing anything. Note that `uhubctl` lives in `/usr/sbin`, off a normal user's
   sticks in the background. Verified 2026-09-11 with simulated unplug/replug (`echo 0/1 > /sys/bus/usb/devices/<port>/authorized`):
   USB STOP -> pull -> re-insert relists the slot; surprise removal + re-insert too.
 - Key operation codes seen in handlers: Jog 4/0/1/5, Sync fires on release (2), AutoBeatLoop 1, BeatJumpLoopMove 3, Pad 1/3.
+- **Settings keys on the touch strip** (2026-09-16, not yet tried on the player): MENU 0x206, KEYBOARD 0x216, SHORTCUT 0x210
+  and UTILITY.
+  `keycodes.txt` has no utility key — on the RX3 the panel button is MENU/UTILITY, so UTILITY is MENU with the panel's
+  "long-pressed" event: press (0), then operation 1, then release (2). The touch bridge sends the 1 right after the press
+  (`hold` in the button table) so a tap is enough; `rx3-control.py utility` and `rx3-control.py hold <key>` do the same
+  from the shell. The 1 always follows a press — on its own it is what poisons a USB STOP slot (see above), and
+  `rx3-control.py hold usbstop` is refused for that reason. To check on the player: (a) a tap on UTILITY opens the
+  utility screen and not the menu; (b) keeping the finger on it past the firmware's own hold threshold (if it times
+  MENU like it times USB STOP) does not fire a second long-press that closes it again. If (a) fails because the
+  firmware acts on MENU's release, drop the injected 1 and defer the release instead (the per-finger timer in
+  touch-bridge.c is there). Nearby keys, still unmapped: Info 0x20b, TagList 0x203, DeckInfoSelect 0x213.
+- The on-screen strip is now 2 rows of 8 cells (16 buttons). Geometry lives in `pi-controls.h`
+  (`BUTTON_COLS/ROWS`, `button_rect`, `button_at`) and both the presenter and the touch bridge use it, so a layout
+  change cannot make the drawn button and the touched button disagree. Labels shrink to fit their cell (26 px down to 15).
 - `rx3-deck.sh state|play|pause <deck>` — screen-verified deck helpers (only valid on the main screen, not the browser).
 - Verified with the meter: both channel faders, trims, EQ and tempo work; tempo appears dead only after SYNC until the
   fader passes the synced value (Pioneer takeover behaviour).

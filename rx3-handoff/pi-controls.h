@@ -11,15 +11,37 @@
 #define CONTENT_H 1000
 struct command {int key,operation,channel,value;float analog;int extra;};
 struct ui_state {unsigned magic;float level[6];unsigned pressed;unsigned headphone_cue;int cursor_x,cursor_y,cursor_visible;};
-struct button {const char *label;int key,channel,scroll;unsigned color;};
-static const struct button buttons[12]={
- {"SOURCE",0x201,0,0,0x08699c},{"BROWSE",0x202,0,0,0x08699c},
- {"BACK",0x420d,0,0,0x283542},{"UP",0x420c,0,-1,0x283542},
- {"DOWN",0x420c,0,1,0x283542},{"ENTER",0x420c,0,0,0x283542},
- {"LOAD 1",0x4311,1,0,0x08699c},{"USB STOP 1 (hold)",0x8002,1,0,0x7a2f2f},
- {"PLAY / PAUSE 1",0x4101,1,0,0x12623a},{"LOAD 2",0x4311,2,0,0x08699c},
- {"USB STOP 2 (hold)",0x8002,2,0,0x7a2f2f},{"PLAY / PAUSE 2",0x4101,2,0,0x12623a}
+/* The button strip: BUTTON_ROWS rows of BUTTON_COLS cells under the content area. Cells past NBUTTONS stay empty.
+   `scroll` makes the button a repeating rotary step (the browse selector); `hold` adds the firmware's operation 1
+   ("long-pressed") right after the press, which is how the panel's MENU key opens UTILITY. */
+#define BUTTON_COLS 8
+#define BUTTON_ROWS 2
+#define BUTTON_TOP CONTENT_H
+#define BUTTON_H ((1200-BUTTON_TOP)/BUTTON_ROWS)
+#define NBUTTONS 16
+struct button {const char *label;int key,channel,scroll,hold;unsigned color;};
+static const struct button buttons[NBUTTONS]={
+ {"SOURCE",0x201,0,0,0,0x08699c},{"BROWSE",0x202,0,0,0,0x08699c},
+ {"MENU",0x206,0,0,0,0x4b3a6d},{"KEYBOARD",0x216,0,0,0,0x4b3a6d},
+ {"UTILITY",0x206,0,0,1,0x4b3a6d},{"BACK",0x420d,0,0,0,0x283542},
+ {"UP",0x420c,0,-1,0,0x283542},{"DOWN",0x420c,0,1,0,0x283542},
+ {"ENTER",0x420c,0,0,0,0x283542},
+ {"LOAD 1",0x4311,1,0,0,0x08699c},{"USB STOP 1 (hold)",0x8002,1,0,0,0x7a2f2f},
+ {"PLAY / PAUSE 1",0x4101,1,0,0,0x12623a},{"LOAD 2",0x4311,2,0,0,0x08699c},
+ {"USB STOP 2 (hold)",0x8002,2,0,0,0x7a2f2f},{"PLAY / PAUSE 2",0x4101,2,0,0,0x12623a},
+ {"SHORTCUT",0x210,0,0,0,0x4b3a6d}
 };
+/* Cell geometry, shared by the presenter and the touch bridge so what is drawn and what is touched always agree.
+   Any width left over when 1920 does not divide by BUTTON_COLS is spread over the leftmost cells. */
+static inline void button_rect(int i,int*x,int*y,int*w,int*h){
+ int col=i%BUTTON_COLS,row=i/BUTTON_COLS,base=1920/BUTTON_COLS,extra=1920%BUTTON_COLS;
+ *x=col*base+(col<extra?col:extra);*w=base+(col<extra);*y=BUTTON_TOP+row*BUTTON_H;*h=BUTTON_H;}
+/* Which button a canvas point lands on, or -1 for the empty cells and everything above the strip. */
+static inline int button_at(int cx,int cy){
+ if(cy<BUTTON_TOP)return -1;int row=(cy-BUTTON_TOP)/BUTTON_H;if(row>=BUTTON_ROWS)return -1;
+ for(int col=0;col<BUTTON_COLS;col++){int i=row*BUTTON_COLS+col,x,y,w,h;if(i>=NBUTTONS)break;
+  button_rect(i,&x,&y,&w,&h);if(cx>=x&&cx<x+w)return i;}
+ return -1;}
 /* Where the 1920x1200 canvas lands on a panel of W x H pixels when drawn rotated `rot` degrees clockwise:
    the letterboxed footprint is lw x lh canvas units scaled by sc, placed at (ox,oy). The presenter and the
    touch bridge both use this, so what is drawn and what is touched always agree. */

@@ -8,6 +8,7 @@
 - USB mouse navigation with an on-screen cursor: left click = touch, wheel = browse selector, right = BACK, middle = ENTER.
   A touch panel is picked up automatically in preference to the mouse.
 - On-screen buttons: SOURCE, BROWSE, BACK, UP/DOWN, ENTER, LOAD 1/2, PLAY/PAUSE 1/2, USB STOP 1/2.
+  MENU, KEYBOARD, UTILITY and SHORTCUT were added on 2026-09-16 and have not been tried on the player yet (see Work in progress).
 
 **USB media**
 - Two sticks presented as USB1 and USB2, through a copy-on-write overlay so the user's files are never modified.
@@ -33,6 +34,9 @@
 
 - **Pad mode LEDs**: the HOT CUE and BEAT JUMP buttons stay dark on the FLX4, though PAD FX and SAMPLER light. The pads themselves work.
 - **Hot cue pad LEDs**: pads do not light to show which cues are set. Needs decoding of the firmware's panel LED stream over the emulated SPI FIFOs.
+- **Settings keys**: the new on-screen MENU (0x206), KEYBOARD (0x216), SHORTCUT (0x210) and UTILITY buttons are untested on hardware.
+  UTILITY sends MENU plus the firmware's "long-pressed" event (operation 1), since the RX3 has no separate utility key.
+  If the firmware acts on MENU's release instead, that tap may open the menu too and the hold needs real timing.
 - **Unmapped pad modes**: pad FX, sampler, keyboard and key shift are not mapped, as the RX3 has no direct equivalent for most of them.
 - **Device names**: SOURCE shows USB1/USB2 rather than each stick's volume label.
 - **No auto-restart**: if the player process crashes the service does not restart it; `systemctl restart rx3` is needed.

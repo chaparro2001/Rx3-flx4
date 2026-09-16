@@ -13,8 +13,12 @@
 static uint32_t frame[1920*1200],chrome[1920*1200];
 static FT_Face face;
 static void box(int x,int y,int w,int h,uint32_t c){for(int yy=y;yy<y+h;yy++)for(int xx=x;xx<x+w;xx++)if(xx>=0&&xx<1920&&yy>=0&&yy<1200)frame[yy*1920+xx]=c;}
+static int textwidth(const char *s,int size){
+ FT_Set_Pixel_Sizes(face,0,size);int w=0;for(const char*p=s;*p;p++){if(FT_Load_Char(face,*p,FT_LOAD_DEFAULT))continue;w+=face->glyph->advance.x>>6;}return w;}
+/* Largest size from `size` down to 15 px whose text still fits in `w`, so a long label never spills out of its cell. */
+static int fitsize(const char *s,int w,int size){while(size>15&&textwidth(s,size)>w)size--;return size;}
 static void label(int cx,int cy,const char *s,int size,uint32_t c){
- FT_Set_Pixel_Sizes(face,0,size);int w=0;for(const char*p=s;*p;p++){FT_Load_Char(face,*p,FT_LOAD_RENDER);w+=face->glyph->advance.x>>6;}
+ int w=textwidth(s,size);
  int x=cx-w/2;for(const char*p=s;*p;p++){if(FT_Load_Char(face,*p,FT_LOAD_RENDER))continue;FT_GlyphSlot g=face->glyph;
  for(unsigned y=0;y<g->bitmap.rows;y++)for(unsigned i=0;i<g->bitmap.width;i++){
  int px=x+g->bitmap_left+i,py=cy+size/3-g->bitmap_top+y;unsigned a=g->bitmap.buffer[y*g->bitmap.pitch+i];
@@ -22,7 +26,10 @@ static void label(int cx,int cy,const char *s,int size,uint32_t c){
  for(int k=0;k<3;k++){unsigned shift=k*8;v|=((((c>>shift)&255)*a+((old>>shift)&255)*(255-a))/255)<<shift;}frame[py*1920+px]=v;
  }x+=g->advance.x>>6;}
 }
-static void drawbutton(int i,int down){int x=(i%6)*320,y=1000+(i/6)*100;box(x+4,y+4,312,92,down?0x536f84:buttons[i].color);label(x+160,y+50,buttons[i].label,26,0xffffff);}
+/* Labels and cells never change, so each button's fitted size is worked out once and kept (pressed buttons are redrawn every frame). */
+static void drawbutton(int i,int down){static int sizes[NBUTTONS];int x,y,w,h;button_rect(i,&x,&y,&w,&h);
+ box(x+4,y+4,w-8,h-8,down?0x536f84:buttons[i].color);
+ const char *t=buttons[i].label;if(!sizes[i])sizes[i]=fitsize(t,w-24,26);label(x+w/2,y+h/2,t,sizes[i],0xffffff);}
 int main(int argc,char**argv){
  if(argc<2)return 2;
  const char*fbpath=argc>2?argv[2]:fb_device();
@@ -61,13 +68,13 @@ int main(int argc,char**argv){
   for(int i=0;fonts[i];i++) fprintf(stderr,"  %s\n",fonts[i]);
   return 1;
  }
- box(0,0,1920,1200,0x101820);for(int i=0;i<12;i++)drawbutton(i,0);
+ box(0,0,1920,1200,0x101820);for(int i=0;i<NBUTTONS;i++)drawbutton(i,0);
  for(int i=0;i<6;i++){int x=i<3?0:1760,y=(i%3)*333;label(x+80,y+27,slider_names[i],23,0xffffff);}
  memcpy(chrome,frame,sizeof(frame));
  for(;;){
  memcpy(frame,chrome,sizeof(frame));
  for(int y=0;y<1000;y++){int sy=y*4/5;for(int x=0;x<1600;x++)frame[y*1920+x+160]=s[sy*1280+x*4/5];}
- for(int i=0;i<12;i++)if(state->pressed&(1u<<i))drawbutton(i,1);
+ for(int i=0;i<NBUTTONS;i++)if(state->pressed&(1u<<i))drawbutton(i,1);
  if(state->cursor_visible){int cx=state->cursor_x,cy=state->cursor_y;   /* arrow pointer: black outline, white fill */
   for(int y=0;y<22;y++)for(int x=0;x<=y&&x<16;x++){int px=cx+x,py=cy+y;if(px<0||px>=1920||py<0||py>=1200)continue;
    int edge=(x==0||x==y||y==21||x==15);frame[py*1920+px]=edge?0x000000:0xffffff;}}

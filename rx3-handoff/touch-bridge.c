@@ -20,9 +20,13 @@ static void command(int key,int op,int ch,int value,float a){struct command c={k
 /* USB STOP (0x8002) is a plain press/release here: the firmware times the hold itself (ejects ~1.9 s after press, a release
    before that cancels). Never send its code 1 "long-pressed" event without a press: that poisons the slot (the next mount is
    unmounted immediately) until the button is tapped once. */
+/* UTILITY is the panel's MENU key held down: press, then operation 1 ("long-pressed"), then release. The 1 goes out
+   right after the press so a tap opens UTILITY, and never on its own (see the USB STOP note above). */
 static void button(int i,int down){
  const struct button*b=&buttons[i];if(down)state->pressed|=1u<<i;else state->pressed&=~(1u<<i);
- if(b->scroll){if(down)command(b->key,4,0,b->scroll,0);}else command(b->key,down?0:2,b->channel,0,0);
+ if(b->scroll){if(down)command(b->key,4,0,b->scroll,0);return;}
+ command(b->key,down?0:2,b->channel,0,0);
+ if(down&&b->hold)command(b->key,1,b->channel,0,0);
 }
 int main(int argc,char**argv){
  if(argc<3)return 2;
@@ -60,7 +64,7 @@ int main(int argc,char**argv){
   else{int px=(int)((long)(f->x-ax.minimum)*W/(ax.maximum-ax.minimum+1)),py=(int)((long)(f->y-ay.minimum)*H/(ay.maximum-ay.minimum+1));panel_to_canvas(&L,px,py,1,&lx,&ly);}
   if(lx<0)lx=0;if(lx>1919)lx=1919;if(ly<0)ly=0;if(ly>1199)ly=1199;
   if(f->down&&!f->active){f->active=1;f->region=-1;
-   if(ly>=1000){f->region=1+(ly-1000)/100*6+lx/320;button(f->region-1,1);f->next_repeat=now+400;}
+   if(ly>=BUTTON_TOP){int b=button_at(lx,ly);if(b>=0){f->region=1+b;button(b,1);f->next_repeat=now+400;}}
    else if(lx<160||lx>=1760){int si=(lx<160?0:3)+ly/333;if(si>5)si=5;
     if((si==0||si==3)&&ly%333>=40&&ly%333<80){int ch=si==0?1:2;command(0x5020,0,ch,0,0);command(0x5020,2,ch,0,0);state->headphone_cue^=ch==1?1:2;}
     else f->region=20+si;
@@ -69,13 +73,13 @@ int main(int argc,char**argv){
   }
   if(f->active&&f->down){
    if(f->region>=20&&ready){int si=f->region-20;float a=(265-(ly-(si%3)*333))/180.f;if(a<0)a=0;if(a>1)a=1;state->level[si]=a;command(slider_keys[si],4,slider_channels[si],0,a);}
-   else if(f->region>0&&f->region<=12&&buttons[f->region-1].scroll&&now>=f->next_repeat){button(f->region-1,1);f->next_repeat=now+120;}
+   else if(f->region>0&&f->region<=NBUTTONS&&buttons[f->region-1].scroll&&now>=f->next_repeat){button(f->region-1,1);f->next_repeat=now+120;}
    else if(f->region==0){ux=(lx-160)*4/5;uy=ly*4/5;if(ux<0)ux=0;if(ux>1279)ux=1279;if(uy<0)uy=0;if(uy>799)uy=799;}
   }
-  if(f->active&&!f->down){if(f->region>0&&f->region<=12)button(f->region-1,0);if(source==i){source=-1;release=10;}f->active=0;}
+  if(f->active&&!f->down){if(f->region>0&&f->region<=NBUTTONS)button(f->region-1,0);if(source==i){source=-1;release=10;}f->active=0;}
  }
  if(source>=0||release){struct report r={source>=0,0,37+(1280-ux)*3976/1280,72+uy*3856/800};if(write(out,&r,sizeof(r))!=sizeof(r))perror("touch report");if(source<0)release--;}
  }
- for(int i=0;i<10;i++)if(fingers[i].active&&fingers[i].region>0&&fingers[i].region<=12)button(fingers[i].region-1,0);
+ for(int i=0;i<10;i++)if(fingers[i].active&&fingers[i].region>0&&fingers[i].region<=NBUTTONS)button(fingers[i].region-1,0);
  return 0;
 }
