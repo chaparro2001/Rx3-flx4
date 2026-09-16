@@ -122,13 +122,15 @@ firmware; `./install.sh clean --all` removes that too. Run it before reinstallin
 
 # Display: HDMI or the Raspberry Pi Touch Display 2
 
-Both work from the same install, with no configuration. The presenter reads the framebuffer's size and
-draws the interface to fit, and the touch bridge uses the same geometry so touches land where things
-are drawn.
+Both work from the same install, with no configuration. The scripts match the connected framebuffer
+against a short list of **display profiles** (`displays.py list`), the presenter lays the interface out on
+the panel itself - the RX3 picture as large as it can be at 16:10, the buttons and slider bars around it,
+no black bars - and the touch bridge uses the same geometry so touches land where things are drawn.
 
-- **HDMI**: any resolution, 16 or 32 bpp. A USB mouse is the pointer unless a touchscreen is present.
+- **HDMI**: any resolution, 16 or 32 bpp, touch or not. A USB mouse is the pointer unless a touchscreen
+  is present. On a 1920x1080 panel the RX3 picture is 1440x900 with the slider bars either side.
 - **Touch Display 2** (7", DSI): detected by the firmware on a Pi 5 with nothing added to `config.txt`.
-  It is a portrait panel (720x1280), so the interface is drawn rotated 90° into a 1152x720 landscape
+  It is a portrait panel (720x1280), so the interface is drawn rotated 90° into a 1280x720 landscape
   picture, and its Goodix touch controller is picked up automatically as the pointer.
   **It needs its own power cable.** The FFC cable carries video, touch and the backlight control, but the
   backlight is powered by the separate 3-pin lead to the GPIO header: red to pin 2 (5 V), black to pin 6
@@ -150,7 +152,31 @@ sudo systemctl restart rx3
 ```
 
 Portrait panels default to 90, landscape ones to 0. The touch mapping follows the same setting.
-`rx3.conf` is also where `RX3_FB` and `RX3_FONT` go; it is sourced by every script.
+
+**If touches land in the wrong place** (mirrored, or moving the finger left moves the touch up), the touch
+controller's axes do not follow the panel's. Tell the bridge how, then restart:
+
+```bash
+echo 'RX3_TOUCH=invy' >> ~/rx3-handoff/rx3.conf      # any of: swap, invx, invy - comma-separated
+sudo systemctl restart rx3
+```
+
+Try `invy`, then `invx`, then `swap` (and combinations) until a tap on LOAD hits LOAD. The bridge
+handles multitouch controllers and single-touch ones (resistive panels, some USB HID screens) alike.
+
+**Everything the display can be told**, all in `rx3.conf`, all optional:
+
+| Variable | Values | What it does |
+|---|---|---|
+| `RX3_DISPLAY` | `td2`, `hdmi1080`, `hdmi`, `custom` | Force a profile instead of auto-detecting (`displays.py list`) |
+| `RX3_FB` | `/dev/fb1` | Draw on this framebuffer (default: the DSI panel if any, else the first) |
+| `RX3_ROTATE` | `0` `90` `180` `270` | Turn the picture, clockwise |
+| `RX3_UI` | `full` `strip` `none` | Buttons and slider bars / buttons only / the RX3 picture alone |
+| `RX3_UI_SCALE` | e.g. `0.8`, `1.3` | Size of the buttons and bars (default: fit the original design to the panel) |
+| `RX3_TOUCH` | `swap`, `invx`, `invy` | Touch axis fixes, see above |
+| `RX3_FONT` | a `.ttf` path | Font for the on-screen labels |
+
+`install.sh doctor` shows the profile in use and every value in effect. `rx3.conf` is sourced by every script.
 
 ---
 

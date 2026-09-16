@@ -23,17 +23,24 @@ rx3_gid_of(){  getent group "$1" 2>/dev/null | cut -d: -f3; }
 RX3_GROUPS="${RX3_GROUPS:-$(printf '%s,%s,%s' "$(rx3_gid_of audio)" "$(rx3_gid_of video)" "$(rx3_gid_of input)")}"
 # Optional per-machine settings (RX3_FB, RX3_ROTATE, RX3_FONT ...): see INSTALL.md "Display".
 [ -f "$RX3_HOME/rx3.conf" ] && . "$RX3_HOME/rx3.conf"
-# Which framebuffer to draw on. A DSI panel such as the Raspberry Pi Touch Display 2 is its own DRM device
-# and gets its own /dev/fbN alongside HDMI, so prefer it when present; otherwise the first framebuffer.
-rx3_pick_fb(){
+# Which display, and how to use it. displays.py matches the connected framebuffer against its profile list (a DSI
+# panel such as the Touch Display 2 is its own DRM device with its own /dev/fbN, and wins over HDMI) and fills in
+# RX3_FB, RX3_ROTATE (0/90/180/270 clockwise), RX3_UI (full/strip/none), RX3_UI_SCALE and RX3_TOUCH (swap/invx/invy).
+# Anything already set - rx3.conf above, or exported - is kept; RX3_DISPLAY=<id> forces a profile. INSTALL.md "Display".
+# rx3.conf assigns plain shell variables, so hand them to displays.py explicitly: it keeps whatever is set.
+if command -v python3 >/dev/null 2>&1; then
+  eval "$(RX3_FB="${RX3_FB:-}" RX3_DISPLAY="${RX3_DISPLAY:-}" RX3_ROTATE="${RX3_ROTATE:-}" RX3_UI="${RX3_UI:-}" \
+          RX3_UI_SCALE="${RX3_UI_SCALE:-}" RX3_TOUCH="${RX3_TOUCH:-}" python3 "$RX3_HOME/displays.py" env 2>/dev/null)"
+fi
+rx3_pick_fb(){   # fallback when displays.py could not run: the DSI framebuffer if any, else the first one
   for f in /sys/class/graphics/fb[0-9]*; do
     case "$(cat "$f/name" 2>/dev/null)" in *dsi*) echo "/dev/$(basename "$f")"; return;; esac
   done
   for f in /dev/fb[0-9]*; do [ -e "$f" ] && { echo "$f"; return; }; done
 }
 RX3_FB="${RX3_FB:-$(rx3_pick_fb)}"
-RX3_ROTATE="${RX3_ROTATE:-}"          # 0/90/180/270 clockwise; empty = portrait panels 90, landscape 0
-export RX3_FB RX3_ROTATE
+: "${RX3_DISPLAY:=}" "${RX3_ROTATE:=}" "${RX3_UI:=}" "${RX3_UI_SCALE:=}" "${RX3_TOUCH:=}"
+export RX3_FB RX3_DISPLAY RX3_ROTATE RX3_UI RX3_UI_SCALE RX3_TOUCH
 
 # A clone made with sudo leaves this directory owned by root, which would put the chroot somewhere
 # like /root/rx3-rootfs. Judge that by the account's home directory rather than by uid, because the

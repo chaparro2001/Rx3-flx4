@@ -12,13 +12,34 @@
   `RX3_ROTATE` (0/90/180/270 clockwise) overrides the default of 90 for portrait panels, 0 for landscape.
   Both go in the optional `rx3.conf`, which every script sources. Framebuffers exist only for displays
   connected at boot.
-- `pi-controls.h` holds the one geometry used by both binaries (`make_layout`, `panel_to_canvas`): the
-  1920x1200 canvas is letterboxed and rotated onto the panel, and the touch bridge maps a touch through
-  the same table, so the earlier 10 % long-axis error (bridge mapped the full 1280 px while the picture
-  was 1152 px) is gone. Rotate 90 puts the canvas's left edge at the panel's top edge (turn the panel
-  anticlockwise to read it); 270 is the other way round.
-- On the TD2 the firmware UI ends up 960x600 px in a 1152x720 picture. `--replay` (rx3-tap.py) and
-  `--mouse` feed canvas coordinates directly, independent of the panel.
+- (2026-09-16, branch display-profiles) **No more fixed 1920x1200 canvas.** `pi-controls.h` lays everything out in
+  "UI space" = the panel the right way up, in panel pixels (`make_ui`): the button strip is `200*scale` px tall, the
+  slider bars `160*scale` wide at least, and the firmware picture is the largest 16:10 rectangle in what is left, with
+  the bars growing to meet it. `scale` defaults to fitting the old 1920x1200 design (`min(uw/1920, uh/1200)`), so the
+  TD2 and the 1440p HDMI look as before minus the black bars; `RX3_UI_SCALE` overrides it (capped so the chrome never
+  takes more than half the panel), `RX3_UI=full|strip|none` drops the bars or all the chrome. The only transform left
+  to the panel is the rotation (`ui_to_panel` / `panel_to_ui`); rotate 90 still puts the UI's left edge along the
+  panel's top edge. Both binaries build the same `struct ui` from the framebuffer size and those variables, so what
+  is drawn and what is touched cannot disagree. 1080p: picture 1440x900 at 240,0 (unchanged size), strip 180 px,
+  bars 240 px, no letterbox.
+- The presenter no longer composes a canvas: one lookup table turns panel pixels into UI pixels (the rotation) and one
+  source column/row per picture column/row samples the firmware's 1280x800 directly - a single resample instead of
+  x1.25 up then down. Pictures smaller than 1280x800 get a 2x2 box filter so the RX3's text stays readable.
+- **Display profiles** (`displays.py`, same shape as `controllers.py`): td2, hdmi1080, hdmi (any other size), custom.
+  Detection = fb name (`dsi`) and `virtual_size`; DSI wins over HDMI. `rx3-env.sh` evals `displays.py env`, which
+  fills RX3_FB / RX3_ROTATE / RX3_UI / RX3_UI_SCALE / RX3_TOUCH from the profile but keeps anything rx3.conf already
+  set (rx3.conf values are plain shell variables, so rx3-env.sh hands them over explicitly - they are not exported).
+  `RX3_DISPLAY=<id>` forces a profile; `displays.py list|detect`; `install.sh doctor` prints the profile in use.
+- **Touch**: `RX3_TOUCH=swap,invx,invy` for controllers whose axes do not follow the panel (swap first, on the
+  controller's axes; the inversions on panel pixels). Single-touch controllers (ABS_X/ABS_Y + BTN_TOUCH, no ABS_MT_*)
+  are handled as finger 0 - before, the bridge exited on them and, since udev tags both kinds ID_INPUT_TOUCHSCREEN,
+  `input-hotplug.sh` had already dropped the mouse for them. The bridge also clears `pressed` at start, so a bridge
+  that died mid-touch no longer leaves a button lit.
+- `--replay` now takes the firmware's own 1280x800 coordinates and `rx3-tap.py` passes them straight through: the tap
+  lands on the picture wherever the panel shows it. `--mouse` works in UI pixels (cursor starts at the centre).
+- Untested on hardware as of 2026-09-16: everything above. What to look at first on the 1080p touch panel: the
+  picture fills the height with the bars at both sides; a tap on LOAD in the track list hits LOAD; if touches land
+  mirrored or transposed, set RX3_TOUCH in rx3.conf (try `invy`, `invx`, `swap` in that order) and restart.
 
 ## Controllers (2026-09-14)
 

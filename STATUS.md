@@ -9,6 +9,9 @@
   A touch panel is picked up automatically in preference to the mouse.
 - On-screen buttons: SOURCE, BROWSE, BACK, UP/DOWN, ENTER, LOAD 1/2, PLAY/PAUSE 1/2, USB STOP 1/2.
   MENU, KEYBOARD, UTILITY and SHORTCUT were added on 2026-09-16 and have not been tried on the player yet (see Work in progress).
+- Display profiles (`displays.py`: td2, hdmi1080, hdmi, custom) picked from the connected framebuffer; the interface is
+  laid out on the panel itself (no letterbox), with `RX3_UI`, `RX3_UI_SCALE` and `RX3_TOUCH` in `rx3.conf` to adjust
+  chrome and touch axes. Added 2026-09-16, untested on hardware (see Work in progress).
 
 **USB media**
 - Two sticks presented as USB1 and USB2, through a copy-on-write overlay so the user's files are never modified.
@@ -37,6 +40,8 @@
 - **Settings keys**: the new on-screen MENU (0x206), KEYBOARD (0x216), SHORTCUT (0x210) and UTILITY buttons are untested on hardware.
   UTILITY sends MENU plus the firmware's "long-pressed" event (operation 1), since the RX3 has no separate utility key.
   If the firmware acts on MENU's release instead, that tap may open the menu too and the hold needs real timing.
+- **Panel-native layout and display profiles**: untested on hardware. On the 1080p touch panel check that the picture
+  fills the height, that taps land where they are drawn, and set `RX3_TOUCH` (invy / invx / swap) if they do not.
 - **Unmapped pad modes**: pad FX, sampler, keyboard and key shift are not mapped, as the RX3 has no direct equivalent for most of them.
 - **Device names**: SOURCE shows USB1/USB2 rather than each stick's volume label.
 - **No auto-restart**: if the player process crashes the service does not restart it; `systemctl restart rx3` is needed.

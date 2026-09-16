@@ -41,10 +41,12 @@ echo "  user    $RX3_USER"
 echo "  chroot  $RX3_ROOT"
 echo "  overlays $RX3_USB"
 if [ -n "$RX3_FB" ] && [ -e "$RX3_FB" ]; then
-  echo "  display $RX3_FB ($(cat /sys/class/graphics/$(basename $RX3_FB)/name 2>/dev/null), $(cat /sys/class/graphics/$(basename $RX3_FB)/virtual_size 2>/dev/null | tr , x) px)${RX3_ROTATE:+ rotate=$RX3_ROTATE}"
+  echo "  display $RX3_FB ($(cat /sys/class/graphics/$(basename $RX3_FB)/name 2>/dev/null), $(cat /sys/class/graphics/$(basename $RX3_FB)/virtual_size 2>/dev/null | tr , x) px)"
+  echo "          profile ${RX3_DISPLAY:-none matched}${RX3_ROTATE:+ rotate=$RX3_ROTATE}${RX3_UI:+ ui=$RX3_UI}${RX3_UI_SCALE:+ scale=$RX3_UI_SCALE}${RX3_TOUCH:+ touch=$RX3_TOUCH}  (RX3_DISPLAY=<id> in rx3.conf picks another)"
 else
   echo "  display none yet (connect HDMI or the DSI touch panel and reboot)"
 fi
+python3 "$RX3_HOME/displays.py" list 2>/dev/null | sed 's/^/          /'
 echo
 
 case "$RX3_USERHOME" in
