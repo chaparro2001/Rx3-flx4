@@ -18,16 +18,13 @@ static struct ui_state *state;
 static struct ui u;
 static long millis(void){struct timespec t;clock_gettime(CLOCK_MONOTONIC,&t);return t.tv_sec*1000+t.tv_nsec/1000000;}
 static void command(int key,int op,int ch,int value,float a){struct command c={key,op,ch,value,a,0};if(write(control,&c,sizeof(c))!=sizeof(c))perror("control");}
-/* USB STOP (0x8002) is a plain press/release here: the firmware times the hold itself (ejects ~1.9 s after press, a release
-   before that cancels). Never send its code 1 "long-pressed" event without a press: that poisons the slot (the next mount is
-   unmounted immediately) until the button is tapped once. */
-/* UTILITY is the panel's MENU key held down: press, then operation 1 ("long-pressed"), then release. The 1 goes out
-   right after the press so a tap opens UTILITY, and never on its own (see the USB STOP note above). */
+/* Buttons are a plain press/release: the firmware times its own holds. USB STOP (0x8002) ejects ~1.9 s after the
+   press (a release before that cancels); MENU (0x206) opens UTILITY when held for over a second. Never send the
+   firmware's code 1 "long-pressed" event: for USB STOP it poisons the slot (the next mount is unmounted immediately)
+   until the button is tapped once, and for MENU it does nothing a tap does not (seen on the player, 2026-09-16). */
 static void button(int i,int down){
  const struct button*b=&buttons[i];if(down)state->pressed|=1u<<i;else state->pressed&=~(1u<<i);
- if(b->scroll){if(down)command(b->key,4,0,b->scroll,0);return;}
- command(b->key,down?0:2,b->channel,0,0);
- if(down&&b->hold)command(b->key,1,b->channel,0,0);
+ if(b->scroll){if(down)command(b->key,4,0,b->scroll,0);}else command(b->key,down?0:2,b->channel,0,0);
 }
 /* RX3_TOUCH: "swap", "invx", "invy" (comma-separated) for touch controllers whose axes do not follow the panel's.
    swap is applied first, on the controller's axes; the inversions then act on panel pixels. */

@@ -37,9 +37,8 @@
   that died mid-touch no longer leaves a button lit.
 - `--replay` now takes the firmware's own 1280x800 coordinates and `rx3-tap.py` passes them straight through: the tap
   lands on the picture wherever the panel shows it. `--mouse` works in UI pixels (cursor starts at the centre).
-- Untested on hardware as of 2026-09-16: everything above. What to look at first on the 1080p touch panel: the
-  picture fills the height with the bars at both sides; a tap on LOAD in the track list hits LOAD; if touches land
-  mirrored or transposed, set RX3_TOUCH in rx3.conf (try `invy`, `invx`, `swap` in that order) and restart.
+- Verified 2026-09-16 on the user's 1920x1080 HDMI touch panel (profile hdmi1080, no rx3.conf): picture, strip,
+  bars and touch all right with no RX3_TOUCH needed.
 
 ## Controllers (2026-09-14)
 
@@ -205,17 +204,16 @@ changing anything. Note that `uhubctl` lives in `/usr/sbin`, off a normal user's
   sticks in the background. Verified 2026-09-11 with simulated unplug/replug (`echo 0/1 > /sys/bus/usb/devices/<port>/authorized`):
   USB STOP -> pull -> re-insert relists the slot; surprise removal + re-insert too.
 - Key operation codes seen in handlers: Jog 4/0/1/5, Sync fires on release (2), AutoBeatLoop 1, BeatJumpLoopMove 3, Pad 1/3.
-- **Settings keys on the touch strip** (2026-09-16, not yet tried on the player): MENU 0x206, KEYBOARD 0x216, SHORTCUT 0x210
-  and UTILITY.
-  `keycodes.txt` has no utility key — on the RX3 the panel button is MENU/UTILITY, so UTILITY is MENU with the panel's
-  "long-pressed" event: press (0), then operation 1, then release (2). The touch bridge sends the 1 right after the press
-  (`hold` in the button table) so a tap is enough; `rx3-control.py utility` and `rx3-control.py hold <key>` do the same
-  from the shell. The 1 always follows a press — on its own it is what poisons a USB STOP slot (see above), and
-  `rx3-control.py hold usbstop` is refused for that reason. To check on the player: (a) a tap on UTILITY opens the
-  utility screen and not the menu; (b) keeping the finger on it past the firmware's own hold threshold (if it times
-  MENU like it times USB STOP) does not fire a second long-press that closes it again. If (a) fails because the
-  firmware acts on MENU's release, drop the injected 1 and defer the release instead (the per-finger timer in
-  touch-bridge.c is there). Nearby keys, still unmapped: Info 0x20b, TagList 0x203, DeckInfoSelect 0x213.
+- **Settings keys on the touch strip** (2026-09-16): SHORTCUT 0x210, KEYBOARD 0x216, MENU / UTILITY 0x206.
+  `keycodes.txt` has no utility key: on the RX3 the panel button is MENU/UTILITY (tap = MENU, held > 1 s = UTILITY).
+  First attempt sent press + the firmware's "long-pressed" code 1 + release: **on the player that just opened MENU**, so
+  the firmware times the hold itself, as it does for USB STOP, and code 1 is not the way in. The on-screen button is
+  therefore a plain press/release like every other, and the user holds it; `rx3-control.py utility` (= `hold menu`)
+  presses, waits 1.5 s, releases. Code 1 is never sent by us (it poisons a USB STOP slot, see above).
+  KEYBOARD 0x216 did nothing from the main screen; it is in the touch-GUI key block (Shortcut, DeckInfoSelect,
+  TouchPanelOn), so it likely only works inside SEARCH - to check: `rx3-control.py search`, then `keyboard`. If it
+  never does anything on its own, the button should send SEARCH 0x205. Still unmapped: Info 0x20b, TagList 0x203,
+  DeckInfoSelect 0x213.
 - The on-screen strip is now 2 rows of 8 cells (16 buttons). Geometry lives in `pi-controls.h`
   (`BUTTON_COLS/ROWS`, `button_rect`, `button_at`) and both the presenter and the touch bridge use it, so a layout
   change cannot make the drawn button and the touched button disagree. Labels shrink to fit their cell (26 px down to 15).

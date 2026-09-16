@@ -7,11 +7,11 @@
 - Starts at boot through the `rx3` systemd service, bringing up display, bridges and USB media automatically.
 - USB mouse navigation with an on-screen cursor: left click = touch, wheel = browse selector, right = BACK, middle = ENTER.
   A touch panel is picked up automatically in preference to the mouse.
-- On-screen buttons: SOURCE, BROWSE, BACK, UP/DOWN, ENTER, LOAD 1/2, PLAY/PAUSE 1/2, USB STOP 1/2.
-  MENU, KEYBOARD, UTILITY and SHORTCUT were added on 2026-09-16 and have not been tried on the player yet (see Work in progress).
+- On-screen buttons: SOURCE, BROWSE, SHORTCUT, MENU / UTILITY (hold), BACK, UP/DOWN, ENTER, LOAD 1/2, PLAY/PAUSE 1/2,
+  USB STOP 1/2, plus KEYBOARD (see Work in progress). MENU verified on the player 2026-09-16.
 - Display profiles (`displays.py`: td2, hdmi1080, hdmi, custom) picked from the connected framebuffer; the interface is
   laid out on the panel itself (no letterbox), with `RX3_UI`, `RX3_UI_SCALE` and `RX3_TOUCH` in `rx3.conf` to adjust
-  chrome and touch axes. Added 2026-09-16, untested on hardware (see Work in progress).
+  chrome and touch axes. Verified 2026-09-16 on a 1920x1080 HDMI touch panel: picture and touch right without any setting.
 
 **USB media**
 - Two sticks presented as USB1 and USB2, through a copy-on-write overlay so the user's files are never modified.
@@ -37,11 +37,11 @@
 
 - **Pad mode LEDs**: the HOT CUE and BEAT JUMP buttons stay dark on the FLX4, though PAD FX and SAMPLER light. The pads themselves work.
 - **Hot cue pad LEDs**: pads do not light to show which cues are set. Needs decoding of the firmware's panel LED stream over the emulated SPI FIFOs.
-- **Settings keys**: the new on-screen MENU (0x206), KEYBOARD (0x216), SHORTCUT (0x210) and UTILITY buttons are untested on hardware.
-  UTILITY sends MENU plus the firmware's "long-pressed" event (operation 1), since the RX3 has no separate utility key.
-  If the firmware acts on MENU's release instead, that tap may open the menu too and the hold needs real timing.
-- **Panel-native layout and display profiles**: untested on hardware. On the 1080p touch panel check that the picture
-  fills the height, that taps land where they are drawn, and set `RX3_TOUCH` (invy / invx / swap) if they do not.
+- **KEYBOARD (0x216) does nothing** from the main screen. It sits among the firmware's touch-GUI keys (Shortcut,
+  DeckInfoSelect, TouchPanelOn), so it probably only acts inside the SEARCH screen; to be checked, else the button
+  should send SEARCH (0x205) instead.
+- **UTILITY by holding MENU / UTILITY** for over a second: the firmware times the hold itself (sending it its
+  "long-pressed" code just opened MENU). Verify the hold on the on-screen button opens the UTILITY screen.
 - **Unmapped pad modes**: pad FX, sampler, keyboard and key shift are not mapped, as the RX3 has no direct equivalent for most of them.
 - **Device names**: SOURCE shows USB1/USB2 rather than each stick's volume label.
 - **No auto-restart**: if the player process crashes the service does not restart it; `systemctl restart rx3` is needed.

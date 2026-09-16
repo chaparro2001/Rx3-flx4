@@ -5,8 +5,8 @@ usage: rx3-control.py mount [usb1|usb2] [chroot-path]
        rx3-control.py rotary <+N|-N>            (browse selector)
        rx3-control.py press <keyname> [channel]   (press only)
        rx3-control.py release <keyname> [channel] (release only)
-       rx3-control.py hold <keyname> [channel]    (press + "long-pressed" + release)
-       rx3-control.py utility                     (MENU held: the UTILITY screen)
+       rx3-control.py hold <keyname> [channel]    (press, held 1.5 s, release: the firmware times its own holds)
+       rx3-control.py utility                     (= hold menu: the UTILITY screen)
 """
 import os,struct,time,sys
 import rx3_env
@@ -37,13 +37,13 @@ f=os.open(root+'/dev/rx3-control',os.O_RDWR|os.O_NONBLOCK)
 def send(k,op,ch=0,val=0,analog=0.0): os.write(f,struct.pack('<iiiifi',k,op,ch,val,analog,0))
 if a[0]=='rotary': send(0x420c,4,0,int(a[1])); sys.exit(0)
 if a[0] in('press','release'): send(key_of(a[1]),0 if a[0]=='press' else 2,int(a[2]) if len(a)>2 else 0); sys.exit(0)
-# Held key: the panel sends the press, then operation 1 ("long-pressed"), then the release. MENU held opens UTILITY.
-# USB STOP is excluded on purpose: the firmware times that hold itself and a bare code 1 poisons the slot (PI-SETUP-NOTES).
+# Held key: press, wait, release. The firmware times the hold itself (MENU held > 1 s = UTILITY, USB STOP ~1.9 s = eject);
+# its internal "long-pressed" code 1 must not be sent by us - it poisons a USB STOP slot and does nothing for MENU.
 if a[0] in('hold','utility'):
     if a[0]=='hold' and len(a)<2: print(__doc__); sys.exit(2)
     k=keys['menu'] if a[0]=='utility' else key_of(a[1]); ch=int(a[2]) if a[0]=='hold' and len(a)>2 else 0
-    if k==keys['usbstop']: print('use "usbstop <slot>": the firmware times that hold itself',file=sys.stderr); sys.exit(2)
-    send(k,0,ch); time.sleep(.1); send(k,1,ch); time.sleep(.1); send(k,2,ch); sys.exit(0)
+    if k==keys['usbstop']: print('use "usbstop <slot>"',file=sys.stderr); sys.exit(2)
+    send(k,0,ch); time.sleep(1.5); send(k,2,ch); sys.exit(0)
 k=key_of(a[0]); ch=int(a[1]) if len(a)>1 else 0
 if a[0]=='usbstop': slot=int(a[1]) if len(a)>1 else 1; send(k,0,slot); time.sleep(2.5); send(k,2,slot); sys.exit(0)   # USB STOP <slot>: the firmware times the hold itself (~1.9 s after press); never send code 1 without a press
 if len(a)>2: send(k,5 if a[0]=='tempo' else 4,ch,0,float(a[2]))   # tempo slider needs operation 5
