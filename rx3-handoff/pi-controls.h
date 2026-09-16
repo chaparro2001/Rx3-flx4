@@ -21,7 +21,7 @@ struct ui_state {unsigned magic;float level[6];unsigned pressed;unsigned headpho
 struct button {const char *label,*brief;int key,channel,scroll,hold;unsigned color;};
 static const struct button buttons[NBUTTONS]={
  {"SOURCE",0,0x201,0,0,0,0x08699c},{"BROWSE",0,0x202,0,0,0,0x08699c},
- {"SHORTCUT",0,0x210,0,0,0,0x4b3a6d},{"KEYBOARD",0,0x216,0,0,0,0x4b3a6d},
+ {"SHORTCUT",0,0x210,0,0,0,0x4b3a6d},{"SEARCH",0,0x205,0,0,0,0x4b3a6d},
  {"UTILITY",0,0x206,0,0,1,0x4b3a6d},{"BACK",0,0x420d,0,0,0,0x283542},
  {"UP",0,0x420c,0,-1,0,0x283542},{"DOWN",0,0x420c,0,1,0,0x283542},
  {"ENTER",0,0x420c,0,0,0,0x283542},

@@ -209,10 +209,10 @@ changing anything. Note that `uhubctl` lives in `/usr/sbin`, off a normal user's
   utility` / `hold <key>` do the same from the shell). On the player this shows the same screen as a plain MENU tap,
   which is the screen the user wants, so there is one UTILITY button and no separate MENU. Code 1 always follows a
   press: on its own it poisons a USB STOP slot (see above), and `rx3-control.py hold usbstop` is refused.
-  KEYBOARD 0x216 did nothing from the main screen; it is in the touch-GUI key block (Shortcut, DeckInfoSelect,
-  TouchPanelOn), so it likely only works inside SEARCH - to check: `rx3-control.py search`, then `keyboard`. If it
-  never does anything on its own, the button should send SEARCH 0x205. Still unmapped: Info 0x20b, TagList 0x203,
-  DeckInfoSelect 0x213.
+  KEYBOARD 0x216 did nothing from the main screen (it is in the touch-GUI key block with Shortcut, DeckInfoSelect,
+  TouchPanelOn, so it probably only means something inside a text-entry screen); the button sends SEARCH 0x205
+  instead, which is what "keyboard" is for. Still unmapped: Info 0x20b, TagList 0x203, DeckInfoSelect 0x213, and
+  Keyboard 0x216 itself.
 - The on-screen strip is now 2 rows of 8 cells (16 buttons). Geometry lives in `pi-controls.h`
   (`BUTTON_COLS/ROWS`, `button_rect`, `button_at`) and both the presenter and the touch bridge use it, so a layout
   change cannot make the drawn button and the touched button disagree. Labels shrink to fit their cell (26 px down to 15).
