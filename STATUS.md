@@ -7,9 +7,10 @@
 - Starts at boot through the `rx3` systemd service, bringing up display, bridges and USB media automatically.
 - USB mouse navigation with an on-screen cursor: left click = touch, wheel = browse selector, right = BACK, middle = ENTER.
   A touch panel is picked up automatically in preference to the mouse.
-- On-screen buttons, 2 rows of 10: SOURCE, BROWSE, SHORTCUT, SEARCH, UTILITY, BACK, UP/DOWN, ENTER; then per deck
-  LOAD, USB STOP, PLAY/PAUSE, QUANTIZE, MASTER TEMPO. UTILITY verified on the player 2026-09-16; QUANTIZE and
-  MASTER TEMPO added afterwards, untested (their state shows only in the RX3's own deck display).
+- On-screen buttons, 2 rows of 10, in pages: the main page has SOURCE, BROWSE, SHORTCUT, SEARCH, UTILITY, BACK,
+  UP/DOWN, ENTER and per deck LOAD, USB STOP, PLAY/PAUSE and a DECK 1 / DECK 2 button; DECK n opens that deck's page
+  with MASTER TEMPO, QUANTIZE and a BACK to the main page. UTILITY, QUANTIZE and MASTER TEMPO verified on the player
+  2026-09-16/17 (their state shows only in the RX3's own deck display); the pages themselves are untested.
 - Display profiles (`displays.py`: td2, hdmi1080, hdmi, custom) picked from the connected framebuffer; the interface is
   laid out on the panel itself (no letterbox), with `RX3_UI`, `RX3_UI_SCALE` and `RX3_TOUCH` in `rx3.conf` to adjust
   chrome and touch axes. Verified 2026-09-16 on a 1920x1080 HDMI touch panel: picture and touch right without any setting.

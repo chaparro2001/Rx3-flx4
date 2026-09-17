@@ -10,28 +10,50 @@
 #define SRC_W 1280
 #define SRC_H 800
 struct command {int key,operation,channel,value;float analog;int extra;};
-struct ui_state {unsigned magic;float level[6];unsigned pressed;unsigned headphone_cue;int cursor_x,cursor_y,cursor_visible;};
-/* The button strip: BUTTON_ROWS rows of BUTTON_COLS cells under the content area. Row 1 is navigation, row 2 the two
-   decks. An entry with no label is an empty cell (drawn as background, touches ignored), as are cells past NBUTTONS.
+struct ui_state {unsigned magic;float level[6];unsigned pressed;unsigned headphone_cue;int cursor_x,cursor_y,cursor_visible;int page;};
+/* The button strip: BUTTON_ROWS rows of BUTTON_COLS cells under the content area, showing one *page* of buttons at a
+   time. The main page has navigation on row 1 and the decks on row 2; DECK 1 / DECK 2 switch to a page with that deck's
+   toggles and a BACK that returns to the main page. A page button sends nothing to the firmware. An entry with no label
+   is an empty cell (drawn as background, touches ignored), as are cells past the page's count.
    `scroll` makes the button a repeating rotary step (the browse selector); `hold` adds the firmware's operation 1
    ("long-pressed") right after the press - UTILITY is the panel's MENU key (0x206) held down. QUANTIZE and MASTER
    TEMPO are toggles whose state only the RX3's own deck display shows (the firmware reports no LED state to us). */
 #define BUTTON_COLS 10
 #define BUTTON_ROWS 2
-#define NBUTTONS 20
-/* `brief` is drawn instead of `label` when the cell is too narrow for the full text even at the smallest font. */
-struct button {const char *label,*brief;int key,channel,scroll,hold;unsigned color;};
-static const struct button buttons[NBUTTONS]={
- {"SOURCE",0,0x201,0,0,0,0x08699c},{"BROWSE",0,0x202,0,0,0,0x08699c},
- {"SHORTCUT",0,0x210,0,0,0,0x4b3a6d},{"SEARCH",0,0x205,0,0,0,0x4b3a6d},
- {"UTILITY",0,0x206,0,0,1,0x4b3a6d},{"BACK",0,0x420d,0,0,0,0x283542},
- {"UP",0,0x420c,0,-1,0,0x283542},{"DOWN",0,0x420c,0,1,0,0x283542},
- {"ENTER",0,0x420c,0,0,0,0x283542},{0,0,0,0,0,0,0},
- {"LOAD 1",0,0x4311,1,0,0,0x08699c},{"USB STOP 1 (hold)","EJECT 1",0x8002,1,0,0,0x7a2f2f},
- {"PLAY / PAUSE 1","PLAY 1",0x4101,1,0,0,0x12623a},{"QUANTIZE 1","Q 1",0x410b,1,0,0,0x5a4a1f},{"MASTER TEMPO 1","MT 1",0x4108,1,0,0,0x5a4a1f},
- {"LOAD 2",0,0x4311,2,0,0,0x08699c},{"USB STOP 2 (hold)","EJECT 2",0x8002,2,0,0,0x7a2f2f},
- {"PLAY / PAUSE 2","PLAY 2",0x4101,2,0,0,0x12623a},{"QUANTIZE 2","Q 2",0x410b,2,0,0,0x5a4a1f},{"MASTER TEMPO 2","MT 2",0x4108,2,0,0,0x5a4a1f}
+#define NBUTTONS (BUTTON_COLS*BUTTON_ROWS)     /* cells per page */
+/* `brief` is drawn instead of `label` when the cell is too narrow for the full text even at the smallest font.
+   `page` >= 0 makes the button switch the strip to that page instead of sending `key`. */
+struct button {const char *label,*brief;int key,channel,scroll,hold,page;unsigned color;};
+enum {PAGE_MAIN,PAGE_DECK1,PAGE_DECK2,NPAGES};
+#define C_NAV 0x08699c
+#define C_SET 0x4b3a6d
+#define C_KEY 0x283542
+#define C_LOAD 0x08699c
+#define C_STOP 0x7a2f2f
+#define C_PLAY 0x12623a
+#define C_DECK 0x5a4a1f
+#define KEY(l,b,k,ch,col) {l,b,k,ch,0,0,-1,col}
+#define EMPTY {0,0,0,0,0,0,-1,0}
+static const struct button main_buttons[]={
+ KEY("SOURCE",0,0x201,0,C_NAV),KEY("BROWSE",0,0x202,0,C_NAV),KEY("SHORTCUT",0,0x210,0,C_SET),KEY("SEARCH",0,0x205,0,C_SET),
+ {"UTILITY",0,0x206,0,0,1,-1,C_SET},KEY("BACK",0,0x420d,0,C_KEY),{"UP",0,0x420c,0,-1,0,-1,C_KEY},{"DOWN",0,0x420c,0,1,0,-1,C_KEY},
+ KEY("ENTER",0,0x420c,0,C_KEY),EMPTY,
+ KEY("LOAD 1",0,0x4311,1,C_LOAD),KEY("USB STOP 1 (hold)","EJECT 1",0x8002,1,C_STOP),KEY("PLAY / PAUSE 1","PLAY 1",0x4101,1,C_PLAY),
+ {"DECK 1",0,0,0,0,0,PAGE_DECK1,C_DECK},EMPTY,
+ KEY("LOAD 2",0,0x4311,2,C_LOAD),KEY("USB STOP 2 (hold)","EJECT 2",0x8002,2,C_STOP),KEY("PLAY / PAUSE 2","PLAY 2",0x4101,2,C_PLAY),
+ {"DECK 2",0,0,0,0,0,PAGE_DECK2,C_DECK}
 };
+static const struct button deck1_buttons[]={
+ KEY("MASTER TEMPO 1","MT 1",0x4108,1,C_DECK),KEY("QUANTIZE 1","Q 1",0x410b,1,C_DECK),EMPTY,EMPTY,EMPTY,EMPTY,EMPTY,EMPTY,EMPTY,
+ {"BACK",0,0,0,0,0,PAGE_MAIN,C_KEY}
+};
+static const struct button deck2_buttons[]={
+ KEY("MASTER TEMPO 2","MT 2",0x4108,2,C_DECK),KEY("QUANTIZE 2","Q 2",0x410b,2,C_DECK),EMPTY,EMPTY,EMPTY,EMPTY,EMPTY,EMPTY,EMPTY,
+ {"BACK",0,0,0,0,0,PAGE_MAIN,C_KEY}
+};
+struct page {const struct button *buttons;int n;};
+#define PAGE(t) {t,(int)(sizeof(t)/sizeof*(t))}
+static const struct page pages[NPAGES]={PAGE(main_buttons),PAGE(deck1_buttons),PAGE(deck2_buttons)};
 static const char *slider_names[6]={"DECK 1","MASTER","HP MIX","DECK 2","HP LEVEL","CROSS"};
 static const int slider_keys[6]={0x501e,0x4403,0x4405,0x501e,0x4406,0x6017};
 static const int slider_channels[6]={1,0,0,2,0,0};
@@ -77,13 +99,14 @@ static inline void button_rect(const struct ui*u,int i,int*x,int*y,int*w,int*h){
  int col=i%BUTTON_COLS,row=i/BUTTON_COLS,base=u->sw/BUTTON_COLS,extra=u->sw%BUTTON_COLS;
  *x=u->sx+col*base+(col<extra?col:extra);*w=base+(col<extra);
  *y=u->sy+row*u->sh/BUTTON_ROWS;*h=u->sy+(row+1)*u->sh/BUTTON_ROWS-*y;}
-/* Which button a UI point lands on, or -1 for the empty cells and everything outside the strip. */
-static inline int button_at(const struct ui*u,int x,int y){
+/* Which button of page `pg` a UI point lands on, or -1 for the empty cells and everything outside the strip. */
+static inline int button_at(const struct ui*u,const struct page*pg,int x,int y){
  if(u->sh==0||y<u->sy||y>=u->sy+u->sh)return -1;
  int row=0;while(row<BUTTON_ROWS-1&&y>=u->sy+(row+1)*u->sh/BUTTON_ROWS)row++;   /* same split as button_rect */
- for(int col=0;col<BUTTON_COLS;col++){int i=row*BUTTON_COLS+col,bx,by,bw,bh;if(i>=NBUTTONS)break;
-  button_rect(u,i,&bx,&by,&bw,&bh);if(x>=bx&&x<bx+bw)return buttons[i].label?i:-1;}
+ for(int col=0;col<BUTTON_COLS;col++){int i=row*BUTTON_COLS+col,bx,by,bw,bh;if(i>=pg->n)break;
+  button_rect(u,i,&bx,&by,&bw,&bh);if(x>=bx&&x<bx+bw)return pg->buttons[i].label?i:-1;}
  return -1;}
+static inline const struct page *page_of(int n){return &pages[n>=0&&n<NPAGES?n:0];}
 /* Slider i (0-2 left bar, 3-5 right bar) is drawn from a 160x333 design box: its origin and the scale that
    fits it, centred in its slot. Touch converts back through the same numbers. */
 static inline void slider_box(const struct ui*u,int i,int*x,int*y,double*s){

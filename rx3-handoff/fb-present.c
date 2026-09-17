@@ -29,16 +29,20 @@ static void label(int cx,int cy,const char *s,int size,uint32_t c){
  for(int k=0;k<3;k++){unsigned shift=k*8;v|=((((c>>shift)&255)*a+((old>>shift)&255)*(255-a))/255)<<shift;}frame[py*UW+px]=v;
  }x+=g->advance.x>>6;}
 }
-/* The text and size for button i in a cell `w` wide: the full label at the largest size that fits, else the brief one.
-   Labels and cells never change, so this is worked out once per button and kept (pressed buttons are redrawn every frame). */
-static const char *button_text(int i,int w,int *size){
- static const char *text[NBUTTONS];static int sizes[NBUTTONS];
- if(!text[i]){int room=w-PX(24),want=PX(26);text[i]=buttons[i].label;sizes[i]=fitsize(text[i],room,want);
-  if(textwidth(text[i],sizes[i])>room&&buttons[i].brief){text[i]=buttons[i].brief;sizes[i]=fitsize(text[i],room,want);}}
- *size=sizes[i];return text[i];}
-static void drawbutton(const struct ui*u,int i,int down){int x,y,w,h,size;if(!buttons[i].label)return;button_rect(u,i,&x,&y,&w,&h);
- int m=PX(4);box(x+m,y+m,w-2*m,h-2*m,down?0x536f84:buttons[i].color);
- const char *t=button_text(i,w,&size);label(x+w/2,y+h/2,t,size,0xffffff);}
+/* The text and size for button i of page p in a cell `w` wide: the full label at the largest size that fits, else the
+   brief one. Labels and cells never change, so this is worked out once per button and kept. */
+static const char *button_text(int p,int i,int w,int *size){
+ static const char *text[NPAGES][NBUTTONS];static int sizes[NPAGES][NBUTTONS];const struct button*b=&pages[p].buttons[i];
+ if(!text[p][i]){int room=w-PX(24),want=PX(26);text[p][i]=b->label;sizes[p][i]=fitsize(b->label,room,want);
+  if(textwidth(b->label,sizes[p][i])>room&&b->brief){text[p][i]=b->brief;sizes[p][i]=fitsize(b->brief,room,want);}}
+ *size=sizes[p][i];return text[p][i];}
+static void drawbutton(const struct ui*u,int p,int i,int down){int x,y,w,h,size;const struct button*b=&pages[p].buttons[i];
+ if(!b->label)return;button_rect(u,i,&x,&y,&w,&h);
+ int m=PX(4);box(x+m,y+m,w-2*m,h-2*m,down?0x536f84:b->color);
+ const char *t=button_text(p,i,w,&size);label(x+w/2,y+h/2,t,size,0xffffff);}
+/* The strip is part of the static chrome; it is redrawn there only when the touch bridge switches page. */
+static void draw_strip(const struct ui*u,int p){uint32_t *live=frame;frame=chrome;
+ box(u->sx,u->sy,u->sw,u->sh,0x101820);for(int i=0;i<pages[p].n;i++)drawbutton(u,p,i,0);frame=live;}
 /* Slider i from its 160x333 design box (slider_box gives the origin and scale; the touch bridge inverts the same numbers). */
 static void drawslider(const struct ui*u,int i,const struct ui_state*st){
  int x,y;double s;slider_box(u,i,&x,&y,&s);
@@ -71,7 +75,7 @@ int main(int argc,char**argv){
  uint32_t *s=mmap(0,SRC_W*SRC_H*4,PROT_READ,MAP_SHARED,src,0);unsigned char *d=mmap(0,f.smem_len,PROT_READ|PROT_WRITE,MAP_SHARED,dst,0);if(s==MAP_FAILED||d==MAP_FAILED)return 1;
  int sf=open(UI_STATE,O_RDWR|O_CREAT,0600);if(sf<0||ftruncate(sf,sizeof(struct ui_state)))return 1;
  struct ui_state *state=mmap(0,sizeof(*state),PROT_READ|PROT_WRITE,MAP_SHARED,sf,0);if(state==MAP_FAILED)return 1;
- if(state->magic!=0x52583332){*state=(struct ui_state){0x52583332,{1,.6,0,1,.5,.5},0,1,0,0,0};}
+ if(state->magic!=0x52583332){*state=(struct ui_state){0x52583332,{1,.6,0,1,.5,.5},0,1,0,0,0,0};}
  /* Any scalable sans will do. Try the usual Debian/Raspbian packages in turn rather than depending on
     one font package, and say which paths were tried instead of exiting silently. $RX3_FONT overrides. */
  static const char *fonts[]={
@@ -94,17 +98,20 @@ int main(int argc,char**argv){
   for(int i=0;fonts[i];i++) fprintf(stderr,"  %s\n",fonts[i]);
   return 1;
  }
- box(0,0,UW,UH,0x101820);if(u.sh)for(int i=0;i<NBUTTONS;i++)drawbutton(&u,i,0);
+ box(0,0,UW,UH,0x101820);
  if(u.bw)for(int i=0;i<6;i++){int x,y;double sc;slider_box(&u,i,&x,&y,&sc);label(x+(int)(80*sc),y+(int)(27*sc),slider_names[i],(int)(23*sc+.5),0xffffff);}
  memcpy(chrome,frame,sizeof(uint32_t)*UW*UH);
+ int shown=-1;
  for(;;){
+ int pg=state->page>=0&&state->page<NPAGES?state->page:0;
+ if(u.sh&&pg!=shown){draw_strip(&u,pg);shown=pg;}
  memcpy(frame,chrome,sizeof(uint32_t)*UW*UH);
  for(int y=0;y<u.ch;y++){uint32_t *out=frame+(u.cy+y)*UW+u.cx;const uint32_t *in=s+row[y]*SRC_W;
   if(!filter)for(int x=0;x<u.cw;x++)out[x]=in[col[x]];
   else{const uint32_t *in2=row[y]+1<SRC_H?in+SRC_W:in;
    for(int x=0;x<u.cw;x++){int c=col[x],c2=c+1<SRC_W?c+1:c;uint32_t a=in[c],b=in[c2],e=in2[c],g=in2[c2];
     out[x]=((a>>2)&0x3f3f3f)+((b>>2)&0x3f3f3f)+((e>>2)&0x3f3f3f)+((g>>2)&0x3f3f3f);}}}   /* per-channel mean, no carry between channels */
- if(u.sh)for(int i=0;i<NBUTTONS;i++)if(state->pressed&(1u<<i))drawbutton(&u,i,1);
+ if(u.sh)for(int i=0;i<pages[pg].n;i++)if(state->pressed&(1u<<i))drawbutton(&u,pg,i,1);
  if(state->cursor_visible){int cx=state->cursor_x,cy=state->cursor_y;   /* arrow pointer: black outline, white fill */
   for(int y=0;y<22;y++)for(int x=0;x<=y&&x<16;x++){int px=cx+x,py=cy+y;if(px<0||px>=UW||py<0||py>=UH)continue;
    int edge=(x==0||x==y||y==21||x==15);frame[py*UW+px]=edge?0x000000:0xffffff;}}

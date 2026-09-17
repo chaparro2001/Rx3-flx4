@@ -24,11 +24,17 @@ static void command(int key,int op,int ch,int value,float a){struct command c={k
 /* UTILITY is the panel's MENU key held down: press, then operation 1 ("long-pressed"), then release. The 1 goes out
    right after the press so a tap is enough, and never on its own (see the USB STOP note above). */
 static void button(int i,int down){
- const struct button*b=&buttons[i];if(down)state->pressed|=1u<<i;else state->pressed&=~(1u<<i);
+ const struct button*b=&page_of(state->page)->buttons[i];if(!b->label||b->page>=0)return;
+ if(down)state->pressed|=1u<<i;else state->pressed&=~(1u<<i);
  if(b->scroll){if(down)command(b->key,4,0,b->scroll,0);return;}
  command(b->key,down?0:2,b->channel,0,0);
  if(down&&b->hold)command(b->key,1,b->channel,0,0);
 }
+/* Switching page: every button still held on the old page is released first (its cell may mean something else on the
+   new page), then the presenter picks the new page up from ui_state. Nothing goes to the firmware for the page button. */
+static void switch_page(struct finger*fingers,int to){
+ for(int i=0;i<10;i++)if(fingers[i].active&&fingers[i].region>0&&fingers[i].region<=NBUTTONS){button(fingers[i].region-1,0);fingers[i].region=-1;}
+ state->pressed=0;state->page=to;fprintf(stderr,"strip page %d\n",to);}
 /* RX3_TOUCH: "swap", "invx", "invy" (comma-separated) for touch controllers whose axes do not follow the panel's.
    swap is applied first, on the controller's axes; the inversions then act on panel pixels. */
 static int t_swap,t_invx,t_invy;
@@ -43,8 +49,8 @@ int main(int argc,char**argv){
  if(in<0||out<0||control<0){perror("open");return 1;}
  int sf=open(UI_STATE,O_RDWR|O_CREAT,0600);if(sf<0||ftruncate(sf,sizeof(struct ui_state)))return 1;
  state=mmap(0,sizeof(*state),PROT_READ|PROT_WRITE,MAP_SHARED,sf,0);if(state==MAP_FAILED)return 1;
- if(state->magic!=0x52583332)*state=(struct ui_state){0x52583332,{1,.6,0,1,.5,.5},0,1,0,0,0};
- state->pressed=0;   /* a bridge that died mid-touch leaves its button lit; nobody else clears it */
+ if(state->magic!=0x52583332)*state=(struct ui_state){0x52583332,{1,.6,0,1,.5,.5},0,1,0,0,0,0};
+ state->pressed=0;state->page=PAGE_MAIN;   /* a bridge that died mid-touch leaves its button lit; nobody else clears it */
  struct finger fingers[10]={0};
  /* Same panel geometry, rotation and chrome as the presenter, so a touch lands exactly under what is drawn there. */
  int W=1920,H=1200;{int fb=open(fb_device(),O_RDONLY);if(fb>=0){struct fb_var_screeninfo v;if(!ioctl(fb,FBIOGET_VSCREENINFO,&v)){W=v.xres;H=v.yres;}close(fb);}}
@@ -84,8 +90,9 @@ int main(int argc,char**argv){
    if(t_invx)px=W-1-px;if(t_invy)py=H-1-py;panel_to_ui(&u,px,py,&lx,&ly);}
   if(lx<0)lx=0;if(lx>=u.uw)lx=u.uw-1;if(ly<0)ly=0;if(ly>=u.uh)ly=u.uh-1;
   if(f->down&&!f->active){f->active=1;f->region=-1;
-   int b=button_at(&u,lx,ly),si=b<0?slider_at(&u,lx,ly):-1;
-   if(b>=0){f->region=1+b;button(b,1);f->next_repeat=now+400;}
+   const struct page*pg=page_of(state->page);int b=button_at(&u,pg,lx,ly),si=b<0?slider_at(&u,lx,ly):-1;
+   if(b>=0&&pg->buttons[b].page>=0)switch_page(fingers,pg->buttons[b].page);
+   else if(b>=0){f->region=1+b;button(b,1);f->next_repeat=now+400;}
    else if(si>=0){int x,y;double s;slider_box(&u,si,&x,&y,&s);double dy=(ly-y)/s;   /* back into the 160x333 design box */
     if((si==0||si==3)&&dy>=40&&dy<80){int ch=si==0?1:2;command(0x5020,0,ch,0,0);command(0x5020,2,ch,0,0);state->headphone_cue^=ch==1?1:2;}
     else f->region=20+si;
@@ -94,7 +101,7 @@ int main(int argc,char**argv){
   }
   if(f->active&&f->down){
    if(f->region>=20&&ready){int si=f->region-20,x,y;double s;slider_box(&u,si,&x,&y,&s);float a=(float)((265-(ly-y)/s)/180.);if(a<0)a=0;if(a>1)a=1;state->level[si]=a;command(slider_keys[si],4,slider_channels[si],0,a);}
-   else if(f->region>0&&f->region<=NBUTTONS&&buttons[f->region-1].scroll&&now>=f->next_repeat){button(f->region-1,1);f->next_repeat=now+120;}
+   else if(f->region>0&&f->region<=NBUTTONS&&page_of(state->page)->buttons[f->region-1].scroll&&now>=f->next_repeat){button(f->region-1,1);f->next_repeat=now+120;}
    else if(f->region==0){ux=(int)((long)(lx-u.cx)*SRC_W/u.cw);uy=(int)((long)(ly-u.cy)*SRC_H/u.ch);if(ux<0)ux=0;if(ux>=SRC_W)ux=SRC_W-1;if(uy<0)uy=0;if(uy>=SRC_H)uy=SRC_H-1;}
   }
   if(f->active&&!f->down){if(f->region>0&&f->region<=NBUTTONS)button(f->region-1,0);if(source==i){source=-1;release=10;}f->active=0;}
