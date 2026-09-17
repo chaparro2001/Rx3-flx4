@@ -199,6 +199,29 @@ def init_leds():
     for d in (1, 2): show_pad_mode(d); led(0x90 + d - 1, 0x54, hp_cue[d])
 threading.Thread(target=init_leds, daemon=True).start()
 
+# ---- PLAY / CUE LEDs from the firmware's own deck state -------------------------------------------------------
+# control-shim.c publishes, every 200 ms, one flag word per deck (bit 1 playing, 2 master tempo, 4 quantize) plus a
+# sequence counter at byte 52 of the shared ui_state file (struct ui_state in pi-controls.h). PLAY lights while the
+# deck plays and CUE while it is stopped, as on a CDJ; both go dark when the counter stops moving (player gone).
+UI_STATE = ROOT + '/dev/rx3-ui-state'
+def deck_state_watch():
+    shown = {1: None, 2: None}; last_seq = None; last_change = time.time()
+    while True:
+        time.sleep(0.1)
+        try:
+            with open(UI_STATE, 'rb') as f: f.seek(52); raw = f.read(12)
+            if len(raw) < 12: continue
+            d1, d2, seq = struct.unpack('<III', raw)
+        except OSError: continue
+        if seq != last_seq: last_seq = seq; last_change = time.time()
+        fresh = time.time() - last_change < 2.0
+        for deck, flags in ((1, d1), (2, d2)):
+            playing = bool(flags & 1) if fresh else None
+            if playing == shown[deck]: continue
+            shown[deck] = playing
+            led(0x90 + deck - 1, 0x0B, playing is True); led(0x90 + deck - 1, 0x0C, playing is False)
+threading.Thread(target=deck_state_watch, daemon=True).start()
+
 # ---- Sound Color FX: the RX3 needs an effect selected before the per-channel COLOR knobs do anything ----
 # Engine effect slots (SoundColorFxManager ctor order = type number): 1 FILTER, 2 NOISE, 3 SWEEP, 4 DUB ECHO, 5 SPACE,
 # 6 CRUSH. Keys: 0x50a6 filter, 0x50a4 noise, 0x50a3 sweep, 0x50a2 dub echo, 0x50a1 space, 0x50a5 crush (pressing the

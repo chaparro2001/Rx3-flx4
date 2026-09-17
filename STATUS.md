@@ -34,7 +34,9 @@
 - Colour FX knobs with the DJ filter selected, plus SMART CFX cycling.
 - Vendor keep-alive so the controller never drops MIDI or mutes itself.
 - Pad mode buttons light to show the selected mode (fixed 2026-09-17: HOT CUE and BEAT JUMP were being handled as plain
-  keys before the LED code ran; measured on the FLX4 that every mode LED answers to its own note). Untested since the fix.
+  keys before the LED code ran; measured on the FLX4 that every mode LED answers to its own note). Verified on the FLX4.
+- PLAY lights while the deck plays and CUE while it is stopped, from the firmware's own state (the bridge reads the
+  deck flags the control shim publishes into ui_state). Added 2026-09-17, untested; LED notes assumed 0B / 0C.
 
 **Host**
 - Wi-Fi and Ethernet, SSH key login, controller re-enumeration after power glitches.
