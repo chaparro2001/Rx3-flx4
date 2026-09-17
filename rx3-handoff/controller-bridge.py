@@ -174,13 +174,18 @@ print('controller-bridge: %s on %s' % (CTL['name'], dev), flush=True)
 DECK_NOTES[CTL['censor']] = 'slip'          # SHIFT+PLAY (censor) drives the RX3's SLIP; the note differs per controller
 
 import threading
-try: midi_out = os.open(dev if dev != '-' else os.environ.get('RX3_MIDI_OUT', '/dev/null'), os.O_WRONLY | (0 if dev != '-' else os.O_CREAT | os.O_APPEND), 0o644)   # keep-alive, init, LEDs
+# The MIDI output is opened shareable (ALSA rawmidi: O_APPEND, which the kernel only allows together with O_NONBLOCK),
+# so led-probe.py can light LEDs alongside a running bridge without stopping the player.
+try: midi_out = os.open(dev if dev != '-' else os.environ.get('RX3_MIDI_OUT', '/dev/null'), os.O_WRONLY | os.O_APPEND | (os.O_NONBLOCK if dev != '-' else os.O_CREAT), 0o644)   # keep-alive, init, LEDs
 except OSError as e: print('controller-bridge: cannot open MIDI out:', e, file=sys.stderr, flush=True); sys.exit(3)
 out_lock = threading.Lock()
 def midi_write(b):
     with out_lock:
-        try: os.write(midi_out, b)
-        except OSError as e: print('controller-bridge: MIDI out failed:', e, file=sys.stderr, flush=True); os._exit(3)
+        for attempt in range(50):           # non-blocking: a full output buffer says EAGAIN, so wait a moment and retry
+            try: os.write(midi_out, b); return
+            except BlockingIOError: time.sleep(0.002)
+            except OSError as e: print('controller-bridge: MIDI out failed:', e, file=sys.stderr, flush=True); os._exit(3)
+        print('controller-bridge: MIDI out stuck (buffer never drained)', file=sys.stderr, flush=True); os._exit(3)
 if CTL['init']: midi_write(CTL['init'])
 if CTL['keepalive']:
     def keepalive():

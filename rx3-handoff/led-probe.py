@@ -37,12 +37,15 @@ if not dev:
         % (', '.join(c['name'] for c in controllers.CONTROLLERS.values()), ', '.join(cards) or 'none'))
 print('led-probe: %s on %s' % (ctl['name'] if ctl else 'unknown controller', dev))
 
-try: out = os.open(dev, os.O_WRONLY | (os.O_APPEND if alongside else 0))
+try: out = os.open(dev, os.O_WRONLY | os.O_APPEND | os.O_NONBLOCK)   # shareable output, like the bridge's (rawmidi needs both flags)
 except OSError as e: die('cannot open %s for writing: %s%s' % (dev, e, ' (stop the player: sudo systemctl stop rx3)' if alongside else ''))
 if alongside: print('led-probe: controller-bridge.py is running - writing alongside it (its keep-alive and input stay with it; no button echo here)')
 lock = threading.Lock()
 def send(b, echo=True):
-    with lock: os.write(out, bytes(b))
+    with lock:
+        for attempt in range(50):
+            try: os.write(out, bytes(b)); break
+            except BlockingIOError: time.sleep(0.002)
     if echo: print('  -> ' + ' '.join('%02X' % x for x in b))
 
 if ctl and ctl['init'] and not alongside: send(ctl['init'], echo=False)
