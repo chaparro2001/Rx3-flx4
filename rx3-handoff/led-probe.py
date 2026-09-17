@@ -25,9 +25,14 @@ def die(m): print('led-probe: ' + m, file=sys.stderr); sys.exit(1)
 if subprocess.run(['pgrep', '-f', r'^python3 \S*controller-bridge\.py'], capture_output=True).returncode == 0:   # anchored: a shell holding this text must not match
     die('controller-bridge.py is running and owns the MIDI device: sudo systemctl stop rx3 first')
 found = controllers.detect()
-ctl = controllers.CONTROLLERS[found[0][1]] if found else None
+forced = os.environ.get('RX3_CONTROLLER')          # RX3_CONTROLLER=flx4 led-probe.py /dev/snd/midiC1D0 when detection fails
+if forced and forced not in controllers.CONTROLLERS: die('RX3_CONTROLLER=%s is not one of %s' % (forced, ', '.join(controllers.CONTROLLERS)))
+ctl = controllers.CONTROLLERS[forced] if forced else (controllers.CONTROLLERS[found[0][1]] if found else None)
 dev = sys.argv[1] if len(sys.argv) > 1 else (controllers.midi_device(found[0][0]) if found else None)
-if not dev: die('no known controller connected (%s)' % ', '.join(c['name'] for c in controllers.CONTROLLERS.values()))
+if not dev:
+    cards = [os.path.basename(d) + ':' + open(d + '/id').read().strip() for d in sorted(__import__('glob').glob('/proc/asound/card[0-9]*')) if os.path.exists(d + '/id')]
+    die('no known controller connected (%s). Sound cards seen: %s. Is it in lsusb? Pass the device by hand: RX3_CONTROLLER=flx4 led-probe.py /dev/snd/midiC?D0'
+        % (', '.join(c['name'] for c in controllers.CONTROLLERS.values()), ', '.join(cards) or 'none'))
 print('led-probe: %s on %s' % (ctl['name'] if ctl else 'unknown controller', dev))
 
 out = os.open(dev, os.O_WRONLY)
