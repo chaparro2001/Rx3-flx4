@@ -181,9 +181,13 @@ changing anything. Note that `uhubctl` lives in `/usr/sbin`, off a normal user's
   built -nostdlib so it cannot include pi-controls.h, hence the fixed offset with a `_Static_assert` on the other side).
   The presenter draws PLAY and MASTER TEMPO lit (paler + bright bottom bar) while the flags say so, and treats them as
   unknown when the counter stops moving for 2 s. Rebuilding the shim = the one gcc line in build-rootfs.sh ("== shim"),
-  no need to rebuild the chroot. QUANTIZE: no engine getter (`isDeckQuantizeAvailable` is availability, not on/off;
-  `setQuantizeBeatValue` sets the utility value); the per-deck on/off is in the player UI - `QuantizeIndicator` 0x124a7c
-  draws it, `CmnFunc_CmnInfo_GetUtilityQuantizeValue` 0x17fcf4 is the utility beat value. Still to locate.
+  no need to rebuild the chroot. QUANTIZE has no engine getter (`isDeckQuantizeAvailable` is availability, not on/off;
+  `setQuantizeBeatValue` sets the utility beat value); the per-deck on/off is player-UI state. Disassembling the
+  firmware's own indicator, `QuantizeIndicator(deck)` 0x124a7c, shows it: `UiGetPlayQuantizeOn(deck)` 0xfd36c (0 = off),
+  then `UiGetPlayQuantizeAvail(deck)` 0xfd39c to dim it when no beat grid is usable. The shim calls the first with deck
+  0/1 for bit 4. Neighbours worth knowing: `UiGetUtilQuantizeValue` 0xfe784 (0..3 = the beat value), `UiSetQuantizeOnOff`
+  0xfe184, `ui::StatWatcher::getPlayQuantizeOn(ENUM_DECK)` 0x2c01c4 underneath, and the same `UiGet*` family exists for
+  Beat FX (`UiGetMixBeatFxQuantizeOn` 0xfe4e0, `UiGetMixBeatFxType` 0xfe498, `UiGetMixBeatFxCh` 0xfe4bc).
 - `rx3-control.py query` dumps engine state via the control shim (key 0xFFFF) to `/tmp/rx3-query.txt` in the chroot; the
   getters need the DjEngineIF instance (global 0x011492d8) as `this` — passing NULL crashes the player.
 - **USB STOP (0x8002)**: send a plain press (code 0) and release (code 2) on channel = slot (1 = USB1, 2 = USB2); the
