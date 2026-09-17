@@ -46,9 +46,9 @@
 
 ## Work in progress
 
-- **Unlit FLX4 buttons**: SYNC, MASTER, SLIP and BEAT FX ON/OFF do not reflect state yet. SYNC/MASTER have known
-  engine getters (`isSyncOn`, `getSyncMaster`); the others still need theirs found. Same path as the rest: shim bit,
-  bridge LED.
+- **Unlit FLX4 buttons**: SLIP and BEAT FX ON/OFF do not reflect state yet; their getters still need finding. Same path
+  as the rest: shim bit, bridge LED. SYNC and MASTER were added 2026-09-17 (`isSyncOn`, `getSyncMaster` +
+  `isSyncMasterValid`), untested on the FLX4.
 - **Unmapped pad modes**: pad FX, sampler, keyboard and key shift are not mapped, as the RX3 has no direct equivalent for most of them.
 - **Device names**: SOURCE shows USB1/USB2 rather than each stick's volume label.
 - **No auto-restart**: if the player process crashes the service does not restart it; `systemctl restart rx3` is needed.

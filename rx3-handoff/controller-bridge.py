@@ -210,7 +210,7 @@ threading.Thread(target=init_leds, daemon=True).start()
 # the counter stops moving (player gone).
 UI_STATE = ROOT + '/dev/rx3-ui-state'
 def deck_state_watch():
-    shown = {1: None, 2: None}; shown_hp = {1: None, 2: None}; shown_loop = {1: None, 2: None}; last_seq = None; last_change = time.time()
+    shown = {1: None, 2: None}; shown_hp = {1: None, 2: None}; shown_loop = {1: None, 2: None}; shown_sync = {1: None, 2: None}; last_seq = None; last_change = time.time()
     hotcues[1] = hotcues[2] = None
     while True:
         time.sleep(0.1)
@@ -231,6 +231,8 @@ def deck_state_watch():
             # Loop LEDs as on a CDJ: IN while the in point is set or the loop plays, OUT while it plays, RELOOP while
             # there is a loop to go back to. The engine has no "in point set" getter, so that part is the bridge's own
             # note of a LOOP IN press, dropped once the loop plays or another track is loaded.
+            sync = (bool(flags & 64), bool(flags & 128)) if fresh else (False, False)   # SYNC on, this deck is the sync master
+            if sync != shown_sync[deck]: shown_sync[deck] = sync; led(0x90 + deck - 1, 0x58, sync[0]); led(0x90 + deck - 1, 0x5C, sync[1])
             looping = bool(flags & 16) if fresh else False; can_reloop = bool(flags & 32) if fresh else False
             if looping: loop_in_pending[deck] = False
             loop = (looping or loop_in_pending[deck], looping, can_reloop)
