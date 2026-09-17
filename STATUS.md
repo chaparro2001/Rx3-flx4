@@ -8,7 +8,7 @@
 - USB mouse navigation with an on-screen cursor: left click = touch, wheel = browse selector, right = BACK, middle = ENTER.
   A touch panel is picked up automatically in preference to the mouse.
 - On-screen buttons, 2 rows of 10, in pages: the main page has SOURCE, BROWSE, SHORTCUT, SEARCH, UTILITY, BACK,
-  UP/DOWN, ENTER, X-FADER (crossfader on/off, starts off, lit from the engine's assignment; added 2026-09-17, untested) and per
+  UP/DOWN, ENTER, X-FADER (crossfader on/off, starts off, lit from the engine's assignment; verified 2026-09-17) and per
   deck LOAD, USB STOP, PLAY/PAUSE and a DECK 1 / DECK 2 button; DECK n opens that deck's page
   with MASTER TEMPO, QUANTIZE and a BACK to the main page. Verified on the player 2026-09-16/17.
 - PLAY/PAUSE, MASTER TEMPO and QUANTIZE buttons light up from the firmware's own state (the control shim publishes
