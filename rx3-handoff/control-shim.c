@@ -69,7 +69,7 @@ static void *control_thread(void *unused){
  }
  return 0;
 }
-/* Deck state for the on-screen buttons: every 200 ms ask the firmware's own getters and publish the answers into the
+/* Deck state for the on-screen buttons: every 50 ms ask the firmware's own getters and publish the answers into the
    presenter's shared state file (struct ui_state in pi-controls.h: deck[2], state_seq, hotcue[2] from byte 52 - this
    file is built without libc headers, so the offset is spelled out). Deck bits: 1 playing, 2 master tempo, 4 quantize,
    8 headphone cue, 16 looping, 32 a loop to reloop, 64 sync on, 128 sync master. hotcue[n] bit k: hot cue A+k of the loaded track is set (for the controller's pad LEDs).
@@ -81,16 +81,17 @@ static void *state_thread(void *unused){
  int (*hpcue)(void*,int)=(void*)0x4eecc;                                          /* getMixerChHeadphoneCue(input) */
  int (*looping)(void*,int)=(void*)0x482e4,(*reloop)(void*,int)=(void*)0x48234;   /* isLooping(ch), isPossibleToReLoop(ch) */
  int (*syncon)(void*,int)=(void*)0x4b700,(*master)(void*)=(void*)0x4b450,(*mastervalid)(void*)=(void*)0x4b4f8;   /* isSyncOn(ch), getSyncMaster(), isSyncMasterValid() */
- int (*hotcue)(void*,int,int)=(void*)0x48b00;                                     /* isRegisteredHotCue(ch, EnCueType): hot cues A..H are types 1..8 (Player::backHotCueGate checks type-1 <= 7) */
+ int (*hotcue)(void*,int,int)=(void*)0x48b00;
+ long (*level)(void*,int)=(void*)0x50170;                                         /* getInputChLevelMono(input): raw, scale not yet known */                                     /* isRegisteredHotCue(ch, EnCueType): hot cues A..H are types 1..8 (Player::backHotCueGate checks type-1 <= 7) */
  while(!*(void *volatile *)0x011492d8||!*(void *volatile *)0x011493c0)sleep(1);
  sleep(5);
  int fd;while((fd=open("/dev/rx3-ui-state",O_WRONLY))<0)sleep(1);   /* the presenter creates it */
  unsigned seq=0;
- for(;;){void *eng=*(void **)0x011492d8;unsigned st[5];int sm=(mastervalid(eng)&0xff)?master(eng):-1;
+ for(;;){void *eng=*(void **)0x011492d8;unsigned st[7];int sm=(mastervalid(eng)&0xff)?master(eng):-1;
   for(int i=0;i<2;i++){st[i]=((playing(eng,i)&0xff)?1:0)|((mtempo(eng,i)&0xff)?2:0)|(quantize(i)?4:0)|((hpcue(eng,i)&0xff)?8:0)|((looping(eng,i)&0xff)?16:0)|((reloop(eng,i)&0xff)?32:0)
    |((syncon(eng,i)&0xff)?64:0)|(sm==i?128:0);
-   unsigned m=0;for(int t=1;t<=8;t++)if(hotcue(eng,i,t)&0xff)m|=1u<<(t-1);st[3+i]=m;}
-  st[2]=++seq;pwrite(fd,st,sizeof st,52);usleep(200000);}
+   unsigned m=0;for(int t=1;t<=8;t++)if(hotcue(eng,i,t)&0xff)m|=1u<<(t-1);st[3+i]=m;st[5+i]=(unsigned)level(eng,i);}
+  st[2]=++seq;pwrite(fd,st,sizeof st,52);usleep(50000);}   /* 20 Hz: the level meters want it, the rest does not mind */
  return 0;
 }
 __attribute__((constructor))static void start_control(void){

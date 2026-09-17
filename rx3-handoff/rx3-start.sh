@@ -65,7 +65,7 @@ echo "player started (pid $!)"
 # --- host-side helpers: controller MIDI bridge, display presenter, touch bridge ------------------
 sleep 4
 if [ -n "$CONTROLLER" ]; then
-  pgrep -f "^python3 $RX3_HOME/controller-bridge" >/dev/null || nohup sudo -u $U env RX3_BRIDGE_LOG=1 python3 $H/controller-bridge.py > $RX3_USERHOME/rx3-controller.log 2>&1 < /dev/null &
+  pgrep -f "^python3 $RX3_HOME/controller-bridge" >/dev/null || nohup sudo -u $U env RX3_BRIDGE_LOG=1 RX3_METER_MAX="${RX3_METER_MAX:-}" python3 $H/controller-bridge.py > $RX3_USERHOME/rx3-controller.log 2>&1 < /dev/null &
 fi
 # A framebuffer only exists for a display that was connected at boot: with nothing plugged in, the kernel
 # finds no CRTC and creates none, so there is nothing for the presenter to draw on. rx3-env.sh picks the

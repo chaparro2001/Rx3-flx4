@@ -215,14 +215,14 @@ threading.Thread(target=init_leds, daemon=True).start()
 # the counter stops moving (player gone).
 UI_STATE = ROOT + '/dev/rx3-ui-state'
 def deck_state_watch():
-    shown = {1: None, 2: None}; shown_hp = {1: None, 2: None}; shown_loop = {1: None, 2: None}; shown_sync = {1: None, 2: None}; last_seq = None; last_change = time.time()
+    shown = {1: None, 2: None}; shown_hp = {1: None, 2: None}; shown_loop = {1: None, 2: None}; shown_sync = {1: None, 2: None}; shown_level = {1: None, 2: None}; last_seq = None; last_change = time.time()
     hotcues[1] = hotcues[2] = None
     while True:
-        time.sleep(0.1)
+        time.sleep(0.05)
         try:
-            with open(UI_STATE, 'rb') as f: f.seek(52); raw = f.read(20)
-            if len(raw) < 20: continue
-            d1, d2, seq, h1, h2 = struct.unpack('<IIIII', raw)
+            with open(UI_STATE, 'rb') as f: f.seek(52); raw = f.read(28)
+            if len(raw) < 28: continue
+            d1, d2, seq, h1, h2, l1, l2 = struct.unpack('<IIIIIII', raw)
         except OSError: continue
         if seq != last_seq: last_seq = seq; last_change = time.time()
         fresh = time.time() - last_change < 2.0
@@ -247,11 +247,19 @@ def deck_state_watch():
         for deck, mask in ((1, h1), (2, h2)):
             mask = mask & 0xFF if fresh else 0
             if mask != hotcues[deck]: hotcues[deck] = mask; show_pads(deck)
+        # Channel level meters: CC 0x02 on the deck channel, 0..127 (measured with led-probe.py). The engine's raw level
+        # is scaled by RX3_METER_MAX (its full-scale value, found by watching `rx3-control.py state` while a track plays);
+        # until that is set the meters stay dark.
+        if METER_MAX:
+            for deck, lvl in ((1, l1), (2, l2)):
+                v = min(127, int(lvl * 127 / METER_MAX)) if fresh and lvl < 0x80000000 else 0
+                if v != shown_level[deck]: shown_level[deck] = v; midi_write(bytes([0xB0 + deck - 1, 0x02, v]))
 # Pad LEDs in HOT CUE mode show which hot cues the loaded track has (hotcue mask from the shim, bit k = pad k+1).
 # Addressing is the pads' own note range for that mode (channel 7 / 9, notes 0x00-0x07), still to be confirmed on the
 # FLX4 - in the other pad modes the pads are left alone.
 hotcues = {1: None, 2: None}
 loop_in_pending = {1: False, 2: False}
+METER_MAX = int(os.environ.get('RX3_METER_MAX', '0'))
 def show_pads(deck):
     if pad_mode[deck] != 0x1B: return
     mask = hotcues[deck] or 0
