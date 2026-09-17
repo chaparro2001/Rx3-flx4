@@ -8,6 +8,7 @@ usage: rx3-control.py mount [usb1|usb2] [chroot-path]
        rx3-control.py hold <keyname> [channel]    (press + "long-pressed" + release)
        rx3-control.py utility                     (= hold menu: the UTILITY screen)
        rx3-control.py state                       (what the control shim publishes about each deck)
+       rx3-control.py xfader                      (toggle the crossfader: CH1=A/CH2=B <-> THRU, like the X-FADER button)
 """
 import os,struct,time,sys
 import rx3_env
@@ -31,10 +32,11 @@ if a[0] in ('mount','umount','remount'):
     if a[0] in ('umount','remount'): fifo('udev_'+port,'umount '+path); time.sleep(1); fifo('udev_usbctn'+n,'disconnect'); time.sleep(2)
     if a[0] in ('mount','remount'): fifo('udev_usbctn'+n,'connect'); time.sleep(1.5); fifo('udev_'+port,'mount '+path)
     sys.exit(0)
+if a[0]=='xfader': send(0xFFFE,0); sys.exit(0)
 if a[0]=='state':
     # struct ui_state (pi-controls.h): the shim's deck flags and sequence counter sit at byte 52
     with open(root+'/dev/rx3-ui-state','rb') as st: st.seek(52); d1,d2,seq,h1,h2,l1,l2=struct.unpack('<IIIIIII',st.read(28))
-    names=[(1,'playing'),(2,'master tempo'),(4,'quantize'),(8,'headphone cue'),(16,'looping'),(32,'reloop possible'),(64,'sync'),(128,'sync master')]
+    names=[(1,'playing'),(2,'master tempo'),(4,'quantize'),(8,'headphone cue'),(16,'looping'),(32,'reloop possible'),(64,'sync'),(128,'sync master'),(256,'crossfader assigned')]
     for d,f,h,l in ((1,d1,h1,l1),(2,d2,h2,l2)):
         db='-inf' if l==0x80000000 else '%+d'%(l if l<0x80000000 else l-0x100000000)
         print('deck %d: %s; hot cues %s; level %s dB'%(d,', '.join(n for b,n in names if f&b) or '-',''.join(chr(65+k) for k in range(8) if h>>k&1) or '-',db))

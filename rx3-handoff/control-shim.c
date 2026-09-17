@@ -20,6 +20,11 @@ static void query_state(void){
  const char *k="realmixer=";while(*k)*p++=*k++;p=putnum(p,realmix(eng));*p++='\n';
  int fd=open("/tmp/rx3-query.txt",01|0100|01000,0644);if(fd>=0){write(fd,buf,p-buf);close(fd);}
 }
+/* djengine::DjEngineIF::getCrossFaderAssign(EnMixerInput) and setCrossFaderAssign(EnMixerInput, EnCrossFaderAssign): 1 = A, 2 = B,
+   anything else = THRU. The setter works on the global engine (this = 0), the getter wants the instance. */
+static int (*xf_get)(void*,int)=(void*)0x4ccc4;
+static void (*xf_set)(void*,int,int)=(void*)0x4cc0c;
+static int xfader_assigned(void *eng){return (xf_get(eng,0)&0xff)==1&&(xf_get(eng,1)&0xff)==2;}
 static void *control_thread(void *unused){
  sleep(3);
  int fd=open("/dev/rx3-control",O_RDWR);
@@ -64,6 +69,9 @@ static void *control_thread(void *unused){
  struct command c;unsigned have=0;
  for(;;){int n=read(fd,(char*)&c+have,sizeof(c)-have);if(n<=0){sleep(1);continue;}have+=n;if(have<sizeof(c))continue;have=0;
   if(c.key==0xFFFF){query_state();continue;}
+  if(c.key==0xFFFE){   /* X-FADER button: toggle CH1=A / CH2=B <-> THRU / THRU (press only) */
+   if(c.operation==0){void *eng=*(void **)0x011492d8;int on=eng&&xfader_assigned(eng);xf_set(0,0,on?0:1);xf_set(0,1,on?0:2);}
+   continue;}
   if(c.key<0||c.key>65535||c.operation<0||c.operation>15||c.channel<0||c.channel>2)continue;
   sendkey(manager,c.key,c.operation,c.channel,c.value,c.analog,c.extra);
  }
@@ -72,7 +80,7 @@ static void *control_thread(void *unused){
 /* Deck state for the on-screen buttons: every 50 ms ask the firmware's own getters and publish the answers into the
    presenter's shared state file (struct ui_state in pi-controls.h: deck[2], state_seq, hotcue[2] from byte 52 - this
    file is built without libc headers, so the offset is spelled out). Deck bits: 1 playing, 2 master tempo, 4 quantize,
-   8 headphone cue, 16 looping, 32 a loop to reloop, 64 sync on, 128 sync master. hotcue[n] bit k: hot cue A+k of the loaded track is set (for the controller's pad LEDs).
+   8 headphone cue, 16 looping, 32 a loop to reloop, 64 sync on, 128 sync master, 256 crossfader assigned (both words). hotcue[n] bit k: hot cue A+k of the loaded track is set (for the controller's pad LEDs).
    Playing and master tempo are DjEngineIF getters (the instance as `this`); quantize on/off is a player-UI setting,
    read the way the firmware's own Q indicator does: QuantizeIndicator (0x124a7c) calls UiGetPlayQuantizeOn(deck). */
 static void *state_thread(void *unused){
@@ -88,8 +96,9 @@ static void *state_thread(void *unused){
  int fd;while((fd=open("/dev/rx3-ui-state",O_WRONLY))<0)sleep(1);   /* the presenter creates it */
  unsigned seq=0;
  for(;;){void *eng=*(void **)0x011492d8;unsigned st[7];int sm=(mastervalid(eng)&0xff)?master(eng):-1;
+  unsigned xf=xfader_assigned(eng)?256:0;
   for(int i=0;i<2;i++){st[i]=((playing(eng,i)&0xff)?1:0)|((mtempo(eng,i)&0xff)?2:0)|(quantize(i)?4:0)|((hpcue(eng,i)&0xff)?8:0)|((looping(eng,i)&0xff)?16:0)|((reloop(eng,i)&0xff)?32:0)
-   |((syncon(eng,i)&0xff)?64:0)|(sm==i?128:0);
+   |((syncon(eng,i)&0xff)?64:0)|(sm==i?128:0)|xf;
    unsigned m=0;for(int t=1;t<=8;t++)if(hotcue(eng,i,t)&0xff)m|=1u<<(t-1);st[3+i]=m;st[5+i]=(unsigned)level(eng,i);}
   st[2]=++seq;pwrite(fd,st,sizeof st,52);usleep(50000);}   /* 20 Hz: the level meters want it, the rest does not mind */
  return 0;

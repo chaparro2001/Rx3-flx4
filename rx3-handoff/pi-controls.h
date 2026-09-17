@@ -26,6 +26,9 @@ struct ui_state {unsigned magic;float level[6];unsigned pressed;unsigned headpho
 #define DECK_RELOOP 32       /* there is a loop to return to (RELOOP/EXIT would do something) */
 #define DECK_SYNC 64         /* beat sync is on */
 #define DECK_MASTER 128      /* this player is the sync master */
+#define DECK_XFADER 256      /* the crossfader is assigned (CH1=A, CH2=B); clear = THRU, the crossfader does nothing. Set in both words. */
+/* Keys above 0xFFF0 are commands for control-shim.c rather than firmware keys: */
+#define CMD_XFADER 0xFFFE    /* press toggles the crossfader assignment */
 #define UI_STATE_DECK_OFFSET 52
 _Static_assert(offsetof(struct ui_state,deck)==UI_STATE_DECK_OFFSET&&offsetof(struct ui_state,hotcue)==UI_STATE_DECK_OFFSET+12&&offsetof(struct ui_state,chlevel)==UI_STATE_DECK_OFFSET+20,"control-shim.c writes deck[2], state_seq, hotcue[2], chlevel[2] from this offset");
 /* The button strip: BUTTON_ROWS rows of BUTTON_COLS cells under the content area, showing one *page* of buttons at a
@@ -56,7 +59,7 @@ enum {PAGE_MAIN,PAGE_DECK1,PAGE_DECK2,NPAGES};
 static const struct button main_buttons[]={
  KEY("SOURCE",0,0x201,0,C_NAV),KEY("BROWSE",0,0x202,0,C_NAV),KEY("SHORTCUT",0,0x210,0,C_SET),KEY("SEARCH",0,0x205,0,C_SET),
  {"UTILITY",0,0x206,0,0,1,-1,0,C_SET},KEY("BACK",0,0x420d,0,C_KEY),{"UP",0,0x420c,0,-1,0,-1,0,C_KEY},{"DOWN",0,0x420c,0,1,0,-1,0,C_KEY},
- KEY("ENTER",0,0x420c,0,C_KEY),EMPTY,
+ KEY("ENTER",0,0x420c,0,C_KEY),LIT("X-FADER","XF",CMD_XFADER,1,DECK_XFADER,C_SET),
  KEY("LOAD 1",0,0x4311,1,C_LOAD),KEY("USB STOP 1 (hold)","EJECT 1",0x8002,1,C_STOP),LIT("PLAY / PAUSE 1","PLAY 1",0x4101,1,DECK_PLAYING,C_PLAY),
  {"DECK 1",0,0,0,0,0,PAGE_DECK1,0,C_DECK},EMPTY,
  KEY("LOAD 2",0,0x4311,2,C_LOAD),KEY("USB STOP 2 (hold)","EJECT 2",0x8002,2,C_STOP),LIT("PLAY / PAUSE 2","PLAY 2",0x4101,2,DECK_PLAYING,C_PLAY),
