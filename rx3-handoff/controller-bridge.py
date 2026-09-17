@@ -190,12 +190,11 @@ PAD_MODES = [0x1B, 0x6D, 0x20, 0x22, 0x1E, 0x6B, 0x69, 0x6F]   # hot cue, beat l
 RX3_PAD_MODES = {0x1B: 'hotcue', 0x20: 'beatjump', 0x6D: 'autobeatloop'}   # the ones the RX3 has, and its key for each
 pad_mode = {1: 0x1B, 2: 0x1B}
 rx3_mode = {1: 'hotcue', 2: 'hotcue'}          # what the firmware is in (hotcue / beatjump / autobeatloop); HOT CUE at power-on
-hp_cue = {1: True, 2: False}                                 # what control-shim.c sets at startup; the real state follows from ui_state
 def show_pad_mode(deck):
     for n in PAD_MODES: led(0x90 + deck - 1, n, n == pad_mode[deck])
 def init_leds():
     time.sleep(1.0)
-    for d in (1, 2): show_pad_mode(d); led(0x90 + d - 1, 0x54, hp_cue[d])
+    for d in (1, 2): show_pad_mode(d)       # PLAY / CUE / headphone CUE come from the engine (deck_state_watch), not from here
 threading.Thread(target=init_leds, daemon=True).start()
 
 # ---- PLAY / CUE LEDs from the firmware's own deck state -------------------------------------------------------
