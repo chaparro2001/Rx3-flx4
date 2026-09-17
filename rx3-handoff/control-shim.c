@@ -45,10 +45,11 @@ static void *control_thread(void *unused){
  sendkey(manager,0x5020,0,1,0,0.f,0);
  sendkey(manager,0x5020,2,1,0,0.f,0);
  /* Crossfader assignment normally comes from the CROSS FADER CURVE panel switch (one position = THRU, which leaves the
-    crossfader inert). Assign CH1=A, CH2=B the way the firmware's own "mixeron" debug command does, once the engine exists. */
+    crossfader inert). Start in THRU, explicitly: the on-screen X-FADER button (command 0xFFFE below) assigns CH1=A,
+    CH2=B the way the firmware's own "mixeron" debug command does, and back. */
  while(!*(void *volatile *)0x011493c0)sleep(1);
  void (*xf_assign)(void*,int,int)=(void*)0x4cc0c;  /* djengine::DjEngineIF::setCrossFaderAssign(EnMixerInput,EnCrossFaderAssign); uses the global engine */
- xf_assign(0,0,1);xf_assign(0,1,2);
+ xf_assign(0,0,0);xf_assign(0,1,0);
  /* Player-to-mixer routing normally follows the INPUT SELECT panel switches; without them both mixer inputs end up fed by
     player 1. Route player 1 -> CH1 and player 2 -> CH2 (djengine::DjEngineIF::setRoute(EnPlayerChannel,EnMixerInput)). */
  sleep(5);

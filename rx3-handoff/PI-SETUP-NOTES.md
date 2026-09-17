@@ -153,6 +153,8 @@ changing anything. Note that `uhubctl` lives in `/usr/sbin`, off a normal user's
 - **Crossfader**: the firmware's crossfader assign per channel defaults to THRU (inert) because the CROSS FADER CURVE panel
   switch state never arrives. `control-shim.c` now calls `djengine::DjEngineIF::setCrossFaderAssign` (0x4cc0c, uses the
   global engine pointer at 0x011493c0) with CH1=A (0,1) and CH2=B (1,2), mirroring the firmware's `allinone_debug::mixeron`.
+  Since 2026-09-17 the shim starts in THRU instead and the on-screen X-FADER button (shim command 0xFFFE, `rx3-control.py
+  xfader`) toggles A/B <-> THRU; `getCrossFaderAssign` (0x4ccc4) feeds bit 256 of the deck flags so the button shows it.
   Enum values: EnMixerInput 0/1 = CH1/CH2; EnCrossFaderAssign 1 = A, 2 = B, other = THRU.
 - Firmware debug UDP socket on 127.0.0.1:20001 (thread DebugSub, commands in `allinone_debug::*`) — packet format not yet
   worked out; plain "mixeron" had no effect.
