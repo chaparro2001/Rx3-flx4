@@ -13,9 +13,18 @@ Usage: controller-bridge.py [/dev/snd/midiC?D0]   (auto-detects the first connec
        RX3_CONTROLLER=flx4|ddj400 forces the controller profile; a device of "-" reads MIDI from stdin and writes
        outgoing MIDI (LEDs, keep-alive) to $RX3_MIDI_OUT, for testing a mapping without the hardware.
 """
-import glob, os, struct, sys, time, threading
+import atexit, glob, os, signal, struct, sys, time, threading
 
 import rx3_env, controllers
+
+# Say why we stop. A SIGTERM/SIGHUP kills Python silently, which once left an empty log and a dead bridge with
+# nothing to go on; now the log ends with the signal (and pid of the sender when the kernel provides it).
+def _on_signal(signum, frame):
+    print('%s controller-bridge: terminated by signal %d (%s)' % (time.strftime('%H:%M:%S'), signum, signal.Signals(signum).name), file=sys.stderr, flush=True)
+    sys.exit(128 + signum)
+for _sig in (signal.SIGTERM, signal.SIGHUP, signal.SIGINT):
+    signal.signal(_sig, _on_signal)
+atexit.register(lambda: print('%s controller-bridge: exiting' % time.strftime('%H:%M:%S'), file=sys.stderr, flush=True))
 ROOT = rx3_env.ROOT
 FIFO = ROOT + '/dev/rx3-control'
 
