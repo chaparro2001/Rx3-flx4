@@ -35,8 +35,12 @@
 - Vendor keep-alive so the controller never drops MIDI or mutes itself.
 - Pad mode buttons light to show the selected mode (fixed 2026-09-17: HOT CUE and BEAT JUMP were being handled as plain
   keys before the LED code ran; measured on the FLX4 that every mode LED answers to its own note). Verified on the FLX4.
-- PLAY lights while the deck plays and CUE while it is stopped, from the firmware's own state (the bridge reads the
-  deck flags the control shim publishes into ui_state). Added 2026-09-17, untested; LED notes assumed 0B / 0C.
+- PLAY lights while the deck plays and CUE while it is stopped, the channel CUE buttons follow the real headphone cue,
+  and in HOT CUE mode the pads show which hot cues the loaded track has - all from the firmware's own state, which the
+  control shim publishes into ui_state and the bridge reads. Verified on the FLX4 2026-09-17.
+- LOOP IN / LOOP OUT / RELOOP light as on a CDJ (in point set or looping / looping / a loop to return to), from
+  `isLooping` and `isPossibleToReLoop`; the "in point set, no loop yet" stretch is the bridge's own note of the
+  LOOP IN press. Added 2026-09-17, untested.
 
 **Host**
 - Wi-Fi and Ethernet, SSH key login, controller re-enumeration after power glitches.

@@ -21,6 +21,8 @@ struct ui_state {unsigned magic;float level[6];unsigned pressed;unsigned headpho
 #define DECK_MASTER_TEMPO 2
 #define DECK_QUANTIZE 4
 #define DECK_HP_CUE 8        /* mixer channel n is sent to the headphones */
+#define DECK_LOOPING 16      /* a loop is playing */
+#define DECK_RELOOP 32       /* there is a loop to return to (RELOOP/EXIT would do something) */
 #define UI_STATE_DECK_OFFSET 52
 _Static_assert(offsetof(struct ui_state,deck)==UI_STATE_DECK_OFFSET&&offsetof(struct ui_state,hotcue)==UI_STATE_DECK_OFFSET+12,"control-shim.c writes deck[2], state_seq, hotcue[2] from this offset");
 /* The button strip: BUTTON_ROWS rows of BUTTON_COLS cells under the content area, showing one *page* of buttons at a

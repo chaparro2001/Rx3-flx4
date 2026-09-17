@@ -95,6 +95,7 @@ def note(status, n, vel):
             if not down: jog_stop(deck)     # the RX3 needs a zero jog report or Play stays blocked after a scratch
             press(K['jogtouch'], deck, down); return
         if name == 'hpcue': press(K['hpcue'], deck, down); return
+        if name == 'loopin' and down: loop_in_pending[deck] = True
         if name: press(K[name], deck, down); return
     if ch in (4, 5):                        # BEAT FX section
         global beatfx_index
@@ -116,7 +117,9 @@ def note(status, n, vel):
         if m:
             key, deck = m
             if key == 'rotary_press': press(K['rotary'], 0, down)
-            else: press(K[key], deck, down)
+            else:
+                if key == 'load' and down: loop_in_pending[deck] = False
+                press(K[key], deck, down)
             return
     elif ch in (7, 9):                      # performance pads, deck 1 / deck 2
         deck = 1 if ch == 7 else 2
@@ -207,7 +210,7 @@ threading.Thread(target=init_leds, daemon=True).start()
 # the counter stops moving (player gone).
 UI_STATE = ROOT + '/dev/rx3-ui-state'
 def deck_state_watch():
-    shown = {1: None, 2: None}; shown_hp = {1: None, 2: None}; last_seq = None; last_change = time.time()
+    shown = {1: None, 2: None}; shown_hp = {1: None, 2: None}; shown_loop = {1: None, 2: None}; last_seq = None; last_change = time.time()
     hotcues[1] = hotcues[2] = None
     while True:
         time.sleep(0.1)
@@ -225,6 +228,15 @@ def deck_state_watch():
                 led(0x90 + deck - 1, 0x0B, playing is True); led(0x90 + deck - 1, 0x0C, playing is False)
             hp = bool(flags & 8) if fresh else False
             if hp != shown_hp[deck]: shown_hp[deck] = hp; led(0x90 + deck - 1, 0x54, hp)
+            # Loop LEDs as on a CDJ: IN while the in point is set or the loop plays, OUT while it plays, RELOOP while
+            # there is a loop to go back to. The engine has no "in point set" getter, so that part is the bridge's own
+            # note of a LOOP IN press, dropped once the loop plays or another track is loaded.
+            looping = bool(flags & 16) if fresh else False; can_reloop = bool(flags & 32) if fresh else False
+            if looping: loop_in_pending[deck] = False
+            loop = (looping or loop_in_pending[deck], looping, can_reloop)
+            if loop != shown_loop[deck]:
+                shown_loop[deck] = loop
+                led(0x90 + deck - 1, 0x10, loop[0]); led(0x90 + deck - 1, 0x11, loop[1]); led(0x90 + deck - 1, 0x4D, loop[2])
         for deck, mask in ((1, h1), (2, h2)):
             mask = mask & 0xFF if fresh else 0
             if mask != hotcues[deck]: hotcues[deck] = mask; show_pads(deck)
@@ -232,6 +244,7 @@ def deck_state_watch():
 # Addressing is the pads' own note range for that mode (channel 7 / 9, notes 0x00-0x07), still to be confirmed on the
 # FLX4 - in the other pad modes the pads are left alone.
 hotcues = {1: None, 2: None}
+loop_in_pending = {1: False, 2: False}
 def show_pads(deck):
     if pad_mode[deck] != 0x1B: return
     mask = hotcues[deck] or 0
