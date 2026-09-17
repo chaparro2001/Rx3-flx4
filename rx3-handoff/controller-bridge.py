@@ -259,7 +259,7 @@ def deck_state_watch():
 # FLX4 - in the other pad modes the pads are left alone.
 hotcues = {1: None, 2: None}
 loop_in_pending = {1: False, 2: False}
-METER_MAX = int(os.environ.get('RX3_METER_MAX', '0'))
+METER_MAX = int(os.environ.get('RX3_METER_MAX') or 0)      # rx3-start.sh passes it empty when rx3.conf does not set it
 def show_pads(deck):
     if pad_mode[deck] != 0x1B: return
     mask = hotcues[deck] or 0
