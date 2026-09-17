@@ -1,4 +1,4 @@
-# Status — 2026-09-11
+# Status — 2026-09-17
 
 ## Working and verified on hardware
 
@@ -9,10 +9,9 @@
   A touch panel is picked up automatically in preference to the mouse.
 - On-screen buttons, 2 rows of 10, in pages: the main page has SOURCE, BROWSE, SHORTCUT, SEARCH, UTILITY, BACK,
   UP/DOWN, ENTER and per deck LOAD, USB STOP, PLAY/PAUSE and a DECK 1 / DECK 2 button; DECK n opens that deck's page
-  with MASTER TEMPO, QUANTIZE and a BACK to the main page. UTILITY, QUANTIZE and MASTER TEMPO verified on the player
-  2026-09-16/17; the pages themselves are untested.
+  with MASTER TEMPO, QUANTIZE and a BACK to the main page. Verified on the player 2026-09-16/17.
 - PLAY/PAUSE, MASTER TEMPO and QUANTIZE buttons light up from the firmware's own state (the control shim publishes
-  `isPlaying` / `isMasterTempo` / `UiGetPlayQuantizeOn` into the shared ui_state every 200 ms). Added 2026-09-17, untested.
+  `isPlaying` / `isMasterTempo` / `UiGetPlayQuantizeOn` into the shared ui_state every 200 ms). Verified 2026-09-17.
 - Display profiles (`displays.py`: td2, hdmi1080, hdmi, custom) picked from the connected framebuffer; the interface is
   laid out on the panel itself (no letterbox), with `RX3_UI`, `RX3_UI_SCALE` and `RX3_TOUCH` in `rx3.conf` to adjust
   chrome and touch axes. Verified 2026-09-16 on a 1920x1080 HDMI touch panel: picture and touch right without any setting.
@@ -40,17 +39,16 @@
   control shim publishes into ui_state and the bridge reads. Verified on the FLX4 2026-09-17.
 - LOOP IN / LOOP OUT / RELOOP light as on a CDJ (in point set or looping / looping / a loop to return to), from
   `isLooping` and `isPossibleToReLoop`; the "in point set, no loop yet" stretch is the bridge's own note of the
-  LOOP IN press. Added 2026-09-17, untested.
+  LOOP IN press. Verified on the FLX4 2026-09-17.
 
 **Host**
 - Wi-Fi and Ethernet, SSH key login, controller re-enumeration after power glitches.
 
 ## Work in progress
 
-- **Hot cue pad LEDs**: the shim now publishes which hot cues (A-H) the loaded track has, per deck (`rx3-control.py
-  state` shows them), and the bridge lights the pads from that in HOT CUE mode on channel 7/9 notes 0-7 - the pad LED
-  addressing is an assumption still to confirm on the FLX4 (an earlier probe on those notes lit nothing, possibly
-  because the controller was in SAMPLER mode).
+- **Unlit FLX4 buttons**: SYNC, MASTER, SLIP and BEAT FX ON/OFF do not reflect state yet. SYNC/MASTER have known
+  engine getters (`isSyncOn`, `getSyncMaster`); the others still need theirs found. Same path as the rest: shim bit,
+  bridge LED.
 - **Unmapped pad modes**: pad FX, sampler, keyboard and key shift are not mapped, as the RX3 has no direct equivalent for most of them.
 - **Device names**: SOURCE shows USB1/USB2 rather than each stick's volume label.
 - **No auto-restart**: if the player process crashes the service does not restart it; `systemctl restart rx3` is needed.
