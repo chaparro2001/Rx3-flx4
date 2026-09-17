@@ -49,7 +49,7 @@ int main(int argc,char**argv){
  if(in<0||out<0||control<0){perror("open");return 1;}
  int sf=open(UI_STATE,O_RDWR|O_CREAT,0600);if(sf<0||ftruncate(sf,sizeof(struct ui_state)))return 1;
  state=mmap(0,sizeof(*state),PROT_READ|PROT_WRITE,MAP_SHARED,sf,0);if(state==MAP_FAILED)return 1;
- if(state->magic!=0x52583332)*state=(struct ui_state){0x52583332,{1,.6,0,1,.5,.5},0,1,0,0,0,0,{0,0},0};
+ if(state->magic!=0x52583332)*state=(struct ui_state){0x52583332,{1,.6,0,1,.5,.5},0,1,0,0,0,0,{0,0},0,{0,0}};
  state->pressed=0;state->page=PAGE_MAIN;   /* a bridge that died mid-touch leaves its button lit; nobody else clears it */
  struct finger fingers[10]={0};
  /* Same panel geometry, rotation and chrome as the presenter, so a touch lands exactly under what is drawn there. */

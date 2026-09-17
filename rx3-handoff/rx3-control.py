@@ -33,9 +33,10 @@ if a[0] in ('mount','umount','remount'):
     sys.exit(0)
 if a[0]=='state':
     # struct ui_state (pi-controls.h): the shim's deck flags and sequence counter sit at byte 52
-    with open(root+'/dev/rx3-ui-state','rb') as st: st.seek(52); d1,d2,seq=struct.unpack('<III',st.read(12))
+    with open(root+'/dev/rx3-ui-state','rb') as st: st.seek(52); d1,d2,seq,h1,h2=struct.unpack('<IIIII',st.read(20))
     names=[(1,'playing'),(2,'master tempo'),(4,'quantize'),(8,'headphone cue')]
-    for d,f in ((1,d1),(2,d2)): print('deck %d: %s'%(d,', '.join(n for b,n in names if f&b) or '-'))
+    for d,f,h in ((1,d1,h1),(2,d2,h2)):
+        print('deck %d: %s; hot cues %s'%(d,', '.join(n for b,n in names if f&b) or '-',''.join(chr(65+k) for k in range(8) if h>>k&1) or '-'))
     print('sequence %d (run twice: if it does not move, the shim is not publishing)'%seq); sys.exit(0)
 if a[0]=='query':
     f=os.open(root+'/dev/rx3-control',os.O_RDWR|os.O_NONBLOCK); os.write(f,struct.pack('<iiiifi',0xFFFF,0,0,0,0.0,0)); os.close(f); time.sleep(0.3)

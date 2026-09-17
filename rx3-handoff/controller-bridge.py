@@ -86,7 +86,7 @@ def note(status, n, vel):
             # to its own note, 0x7F on / 0 off, and nothing else touches it), then forward the RX3's own mode key only
             # when its mode must change - its HOT CUE key toggles HOT CUE <-> GATE CUE on a repeat press.
             if not down: return
-            pad_mode[deck] = n; show_pad_mode(deck)
+            pad_mode[deck] = n; show_pad_mode(deck); show_pads(deck)
             want = RX3_PAD_MODES.get(n)
             if want is None or rx3_mode[deck] == want: return    # pad fx / sampler / keyboard / key shift: no RX3 equivalent
             rx3_mode[deck] = want; press(K[want], deck, True); press(K[want], deck, False); return
@@ -206,12 +206,13 @@ threading.Thread(target=init_leds, daemon=True).start()
 UI_STATE = ROOT + '/dev/rx3-ui-state'
 def deck_state_watch():
     shown = {1: None, 2: None}; shown_hp = {1: None, 2: None}; last_seq = None; last_change = time.time()
+    hotcues[1] = hotcues[2] = None
     while True:
         time.sleep(0.1)
         try:
-            with open(UI_STATE, 'rb') as f: f.seek(52); raw = f.read(12)
-            if len(raw) < 12: continue
-            d1, d2, seq = struct.unpack('<III', raw)
+            with open(UI_STATE, 'rb') as f: f.seek(52); raw = f.read(20)
+            if len(raw) < 20: continue
+            d1, d2, seq, h1, h2 = struct.unpack('<IIIII', raw)
         except OSError: continue
         if seq != last_seq: last_seq = seq; last_change = time.time()
         fresh = time.time() - last_change < 2.0
@@ -222,6 +223,17 @@ def deck_state_watch():
                 led(0x90 + deck - 1, 0x0B, playing is True); led(0x90 + deck - 1, 0x0C, playing is False)
             hp = bool(flags & 8) if fresh else False
             if hp != shown_hp[deck]: shown_hp[deck] = hp; led(0x90 + deck - 1, 0x54, hp)
+        for deck, mask in ((1, h1), (2, h2)):
+            mask = mask & 0xFF if fresh else 0
+            if mask != hotcues[deck]: hotcues[deck] = mask; show_pads(deck)
+# Pad LEDs in HOT CUE mode show which hot cues the loaded track has (hotcue mask from the shim, bit k = pad k+1).
+# Addressing is the pads' own note range for that mode (channel 7 / 9, notes 0x00-0x07), still to be confirmed on the
+# FLX4 - in the other pad modes the pads are left alone.
+hotcues = {1: None, 2: None}
+def show_pads(deck):
+    if pad_mode[deck] != 0x1B: return
+    mask = hotcues[deck] or 0
+    for k in range(8): led(0x97 if deck == 1 else 0x99, k, bool(mask >> k & 1))
 threading.Thread(target=deck_state_watch, daemon=True).start()
 
 # ---- Sound Color FX: the RX3 needs an effect selected before the per-channel COLOR knobs do anything ----

@@ -83,7 +83,7 @@ int main(int argc,char**argv){
  uint32_t *s=mmap(0,SRC_W*SRC_H*4,PROT_READ,MAP_SHARED,src,0);unsigned char *d=mmap(0,f.smem_len,PROT_READ|PROT_WRITE,MAP_SHARED,dst,0);if(s==MAP_FAILED||d==MAP_FAILED)return 1;
  int sf=open(UI_STATE,O_RDWR|O_CREAT,0600);if(sf<0||ftruncate(sf,sizeof(struct ui_state)))return 1;
  struct ui_state *state=mmap(0,sizeof(*state),PROT_READ|PROT_WRITE,MAP_SHARED,sf,0);if(state==MAP_FAILED)return 1;
- if(state->magic!=0x52583332){*state=(struct ui_state){0x52583332,{1,.6,0,1,.5,.5},0,1,0,0,0,0,{0,0},0};}
+ if(state->magic!=0x52583332){*state=(struct ui_state){0x52583332,{1,.6,0,1,.5,.5},0,1,0,0,0,0,{0,0},0,{0,0}};}
  /* Any scalable sans will do. Try the usual Debian/Raspbian packages in turn rather than depending on
     one font package, and say which paths were tried instead of exiting silently. $RX3_FONT overrides. */
  static const char *fonts[]={

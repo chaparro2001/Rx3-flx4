@@ -43,9 +43,10 @@
 
 ## Work in progress
 
-- **Hot cue pad LEDs**: pads do not light to show which cues are set. The FLX4 side is being measured with
-  `led-probe.py` (the pad LEDs do not answer on channel 7 notes 0-7); the firmware side needs the getter for the loaded
-  track's hot cues, to be published through ui_state like the deck flags.
+- **Hot cue pad LEDs**: the shim now publishes which hot cues (A-H) the loaded track has, per deck (`rx3-control.py
+  state` shows them), and the bridge lights the pads from that in HOT CUE mode on channel 7/9 notes 0-7 - the pad LED
+  addressing is an assumption still to confirm on the FLX4 (an earlier probe on those notes lit nothing, possibly
+  because the controller was in SAMPLER mode).
 - **Unmapped pad modes**: pad FX, sampler, keyboard and key shift are not mapped, as the RX3 has no direct equivalent for most of them.
 - **Device names**: SOURCE shows USB1/USB2 rather than each stick's volume label.
 - **No auto-restart**: if the player process crashes the service does not restart it; `systemctl restart rx3` is needed.

@@ -14,15 +14,15 @@ struct command {int key,operation,channel,value;float analog;int extra;};
 /* Shared between the presenter, the touch bridge and the control shim inside the chroot (as /dev/rx3-ui-state).
    `deck[n]` is what the firmware's own engine says about player n (DECK_* bits), published by control-shim.c
    every 200 ms with `state_seq` bumped each time; the presenter treats the flags as unknown when that stops.
-   control-shim.c cannot include this header (-nostdlib build), so it writes the last three words at byte 52. */
+   control-shim.c cannot include this header (-nostdlib build), so it writes the last five words at byte 52. */
 struct ui_state {unsigned magic;float level[6];unsigned pressed;unsigned headphone_cue;int cursor_x,cursor_y,cursor_visible;int page;
- unsigned deck[2];unsigned state_seq;};
+ unsigned deck[2];unsigned state_seq;unsigned hotcue[2];};   /* hotcue[n]: bit k = hot cue A+k of the track on player n is set */
 #define DECK_PLAYING 1
 #define DECK_MASTER_TEMPO 2
 #define DECK_QUANTIZE 4
 #define DECK_HP_CUE 8        /* mixer channel n is sent to the headphones */
 #define UI_STATE_DECK_OFFSET 52
-_Static_assert(offsetof(struct ui_state,deck)==UI_STATE_DECK_OFFSET,"control-shim.c writes the deck flags at this offset");
+_Static_assert(offsetof(struct ui_state,deck)==UI_STATE_DECK_OFFSET&&offsetof(struct ui_state,hotcue)==UI_STATE_DECK_OFFSET+12,"control-shim.c writes deck[2], state_seq, hotcue[2] from this offset");
 /* The button strip: BUTTON_ROWS rows of BUTTON_COLS cells under the content area, showing one *page* of buttons at a
    time. The main page has navigation on row 1 and the decks on row 2; DECK 1 / DECK 2 switch to a page with that deck's
    toggles and a BACK that returns to the main page. A page button sends nothing to the firmware. An entry with no label
