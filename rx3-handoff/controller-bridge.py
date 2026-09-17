@@ -121,7 +121,9 @@ def note(status, n, vel):
     elif ch in (7, 9):                      # performance pads, deck 1 / deck 2
         deck = 1 if ch == 7 else 2
         if n < 0x08 or 0x20 <= n < 0x28 or 0x60 <= n < 0x68:
-            press(PAD[n & 7], deck, down); return
+            press(PAD[n & 7], deck, down)
+            if not down: show_pads(deck)    # the controller darkens a pad when it is released; put the hot cue state back
+            return
     elif ch in (8, 10):                     # shift + pads
         deck = 1 if ch == 8 else 2
         if n < 0x08: press(K['shift'], deck, True); press(PAD[n & 7], deck, down); press(K['shift'], deck, False); return
