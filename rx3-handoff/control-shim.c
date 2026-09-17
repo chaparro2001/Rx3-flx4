@@ -82,7 +82,7 @@ static void *state_thread(void *unused){
  int (*looping)(void*,int)=(void*)0x482e4,(*reloop)(void*,int)=(void*)0x48234;   /* isLooping(ch), isPossibleToReLoop(ch) */
  int (*syncon)(void*,int)=(void*)0x4b700,(*master)(void*)=(void*)0x4b450,(*mastervalid)(void*)=(void*)0x4b4f8;   /* isSyncOn(ch), getSyncMaster(), isSyncMasterValid() */
  int (*hotcue)(void*,int,int)=(void*)0x48b00;
- long (*level)(void*,int)=(void*)0x50170;                                         /* getInputChLevelMono(input): raw, scale not yet known */                                     /* isRegisteredHotCue(ch, EnCueType): hot cues A..H are types 1..8 (Player::backHotCueGate checks type-1 <= 7) */
+ long (*level)(void*,int)=(void*)0x50170;                                         /* getInputChLevelMono(input): whole dB, 0x80000000 = no signal (seen on the player) */                                     /* isRegisteredHotCue(ch, EnCueType): hot cues A..H are types 1..8 (Player::backHotCueGate checks type-1 <= 7) */
  while(!*(void *volatile *)0x011492d8||!*(void *volatile *)0x011493c0)sleep(1);
  sleep(5);
  int fd;while((fd=open("/dev/rx3-ui-state",O_WRONLY))<0)sleep(1);   /* the presenter creates it */

@@ -247,19 +247,23 @@ def deck_state_watch():
         for deck, mask in ((1, h1), (2, h2)):
             mask = mask & 0xFF if fresh else 0
             if mask != hotcues[deck]: hotcues[deck] = mask; show_pads(deck)
-        # Channel level meters: CC 0x02 on the deck channel, 0..127 (measured with led-probe.py). The engine's raw level
-        # is scaled by RX3_METER_MAX (its full-scale value, found by watching `rx3-control.py state` while a track plays);
-        # until that is set the meters stay dark.
-        if METER_MAX:
-            for deck, lvl in ((1, l1), (2, l2)):
-                v = min(127, int(lvl * 127 / METER_MAX)) if fresh and lvl < 0x80000000 else 0
-                if v != shown_level[deck]: shown_level[deck] = v; midi_write(bytes([0xB0 + deck - 1, 0x02, v]))
+        # Channel level meters: CC 0x02 on the deck channel, 0..127. The engine reports each input in whole dB
+        # (getInputChLevelMono; 0x80000000 = no signal), the RX3's own meter spans -24..+10 dB, so that range maps to
+        # 0..127 (RX3_METER_MIN / RX3_METER_MAX in rx3.conf move the ends if the FLX4's segments want it).
+        for deck, lvl in ((1, l1), (2, l2)):
+            if fresh and lvl != 0x80000000:
+                db = lvl - 0x100000000 if lvl >= 0x80000000 else lvl
+                v = max(0, min(127, int((db - METER_MIN) * 127 / (METER_MAX - METER_MIN))))
+            else: v = 0
+            if v != shown_level[deck]: shown_level[deck] = v; midi_write(bytes([0xB0 + deck - 1, 0x02, v]))
 # Pad LEDs in HOT CUE mode show which hot cues the loaded track has (hotcue mask from the shim, bit k = pad k+1).
 # Addressing is the pads' own note range for that mode (channel 7 / 9, notes 0x00-0x07), still to be confirmed on the
 # FLX4 - in the other pad modes the pads are left alone.
 hotcues = {1: None, 2: None}
 loop_in_pending = {1: False, 2: False}
-METER_MAX = int(os.environ.get('RX3_METER_MAX') or 0)      # rx3-start.sh passes it empty when rx3.conf does not set it
+METER_MIN = int(os.environ.get('RX3_METER_MIN') or -24)    # dB at the bottom of the meter (rx3-start.sh passes these empty when unset)
+METER_MAX = int(os.environ.get('RX3_METER_MAX') or 10)     # dB at the top
+if METER_MAX <= METER_MIN: METER_MIN, METER_MAX = -24, 10
 def show_pads(deck):
     if pad_mode[deck] != 0x1B: return
     mask = hotcues[deck] or 0
