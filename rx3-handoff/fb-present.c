@@ -7,6 +7,7 @@
 #include <linux/fb.h>
 #include <stdio.h>
 #include <string.h>
+#include <time.h>
 #include <ft2build.h>
 #include FT_FREETYPE_H
 #include "pi-controls.h"
@@ -36,13 +37,19 @@ static const char *button_text(int p,int i,int w,int *size){
  if(!text[p][i]){int room=w-PX(24),want=PX(26);text[p][i]=b->label;sizes[p][i]=fitsize(b->label,room,want);
   if(textwidth(b->label,sizes[p][i])>room&&b->brief){text[p][i]=b->brief;sizes[p][i]=fitsize(b->brief,room,want);}}
  *size=sizes[p][i];return text[p][i];}
-static void drawbutton(const struct ui*u,int p,int i,int down){int x,y,w,h,size;const struct button*b=&pages[p].buttons[i];
+static uint32_t lighten(uint32_t c){uint32_t r=0;for(int k=0;k<3;k++){unsigned v=(c>>(k*8))&255;v+=(255-v)*2/5;r|=v<<(k*8);}return r;}
+/* A lit button (engine says its toggle is on) is drawn paler with a bright bar along its bottom edge. */
+static void drawbutton(const struct ui*u,int p,int i,int down,int lit){int x,y,w,h,size;const struct button*b=&pages[p].buttons[i];
  if(!b->label)return;button_rect(u,i,&x,&y,&w,&h);
- int m=PX(4);box(x+m,y+m,w-2*m,h-2*m,down?0x536f84:b->color);
+ int m=PX(4);box(x+m,y+m,w-2*m,h-2*m,down?0x536f84:lit?lighten(b->color):b->color);
+ if(lit)box(x+m,y+h-m-PX(6),w-2*m,PX(6),0xeaf3fa);
  const char *t=button_text(p,i,w,&size);label(x+w/2,y+h/2,t,size,0xffffff);}
+/* The deck flags are trusted only while the shim keeps bumping state_seq (it stops with the player). */
+static int state_fresh(const struct ui_state*st){static unsigned seen;static long since=-100000;struct timespec t;clock_gettime(CLOCK_MONOTONIC,&t);
+ long now=t.tv_sec*1000+t.tv_nsec/1000000;if(st->state_seq!=seen){seen=st->state_seq;since=now;}return now-since<2000;}
 /* The strip is part of the static chrome; it is redrawn there only when the touch bridge switches page. */
 static void draw_strip(const struct ui*u,int p){uint32_t *live=frame;frame=chrome;
- box(u->sx,u->sy,u->sw,u->sh,0x101820);for(int i=0;i<pages[p].n;i++)drawbutton(u,p,i,0);frame=live;}
+ box(u->sx,u->sy,u->sw,u->sh,0x101820);for(int i=0;i<pages[p].n;i++)drawbutton(u,p,i,0,0);frame=live;}
 /* Slider i from its 160x333 design box (slider_box gives the origin and scale; the touch bridge inverts the same numbers). */
 static void drawslider(const struct ui*u,int i,const struct ui_state*st){
  int x,y;double s;slider_box(u,i,&x,&y,&s);
@@ -75,7 +82,7 @@ int main(int argc,char**argv){
  uint32_t *s=mmap(0,SRC_W*SRC_H*4,PROT_READ,MAP_SHARED,src,0);unsigned char *d=mmap(0,f.smem_len,PROT_READ|PROT_WRITE,MAP_SHARED,dst,0);if(s==MAP_FAILED||d==MAP_FAILED)return 1;
  int sf=open(UI_STATE,O_RDWR|O_CREAT,0600);if(sf<0||ftruncate(sf,sizeof(struct ui_state)))return 1;
  struct ui_state *state=mmap(0,sizeof(*state),PROT_READ|PROT_WRITE,MAP_SHARED,sf,0);if(state==MAP_FAILED)return 1;
- if(state->magic!=0x52583332){*state=(struct ui_state){0x52583332,{1,.6,0,1,.5,.5},0,1,0,0,0,0};}
+ if(state->magic!=0x52583332){*state=(struct ui_state){0x52583332,{1,.6,0,1,.5,.5},0,1,0,0,0,0,{0,0},0};}
  /* Any scalable sans will do. Try the usual Debian/Raspbian packages in turn rather than depending on
     one font package, and say which paths were tried instead of exiting silently. $RX3_FONT overrides. */
  static const char *fonts[]={
@@ -111,7 +118,8 @@ int main(int argc,char**argv){
   else{const uint32_t *in2=row[y]+1<SRC_H?in+SRC_W:in;
    for(int x=0;x<u.cw;x++){int c=col[x],c2=c+1<SRC_W?c+1:c;uint32_t a=in[c],b=in[c2],e=in2[c],g=in2[c2];
     out[x]=((a>>2)&0x3f3f3f)+((b>>2)&0x3f3f3f)+((e>>2)&0x3f3f3f)+((g>>2)&0x3f3f3f);}}}   /* per-channel mean, no carry between channels */
- if(u.sh)for(int i=0;i<pages[pg].n;i++)if(state->pressed&(1u<<i))drawbutton(&u,pg,i,1);
+ if(u.sh){int fresh=state_fresh(state);for(int i=0;i<pages[pg].n;i++){const struct button*b=&pages[pg].buttons[i];int down=state->pressed&(1u<<i);
+  int lit=fresh&&b->light&&b->channel>=1&&b->channel<=2&&(state->deck[b->channel-1]&b->light);if(down||lit)drawbutton(&u,pg,i,down,lit);}}
  if(state->cursor_visible){int cx=state->cursor_x,cy=state->cursor_y;   /* arrow pointer: black outline, white fill */
   for(int y=0;y<22;y++)for(int x=0;x<=y&&x<16;x++){int px=cx+x,py=cy+y;if(px<0||px>=UW||py<0||py>=UH)continue;
    int edge=(x==0||x==y||y==21||x==15);frame[py*UW+px]=edge?0x000000:0xffffff;}}

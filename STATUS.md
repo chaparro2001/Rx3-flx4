@@ -10,7 +10,10 @@
 - On-screen buttons, 2 rows of 10, in pages: the main page has SOURCE, BROWSE, SHORTCUT, SEARCH, UTILITY, BACK,
   UP/DOWN, ENTER and per deck LOAD, USB STOP, PLAY/PAUSE and a DECK 1 / DECK 2 button; DECK n opens that deck's page
   with MASTER TEMPO, QUANTIZE and a BACK to the main page. UTILITY, QUANTIZE and MASTER TEMPO verified on the player
-  2026-09-16/17 (their state shows only in the RX3's own deck display); the pages themselves are untested.
+  2026-09-16/17; the pages themselves are untested.
+- PLAY/PAUSE and MASTER TEMPO buttons light up from the engine's own state (the control shim publishes `isPlaying` /
+  `isMasterTempo` into the shared ui_state every 200 ms). Added 2026-09-17, untested; QUANTIZE's state is a player-UI
+  setting still to be located (see Work in progress).
 - Display profiles (`displays.py`: td2, hdmi1080, hdmi, custom) picked from the connected framebuffer; the interface is
   laid out on the panel itself (no letterbox), with `RX3_UI`, `RX3_UI_SCALE` and `RX3_TOUCH` in `rx3.conf` to adjust
   chrome and touch axes. Verified 2026-09-16 on a 1920x1080 HDMI touch panel: picture and touch right without any setting.
@@ -39,6 +42,9 @@
 
 - **Pad mode LEDs**: the HOT CUE and BEAT JUMP buttons stay dark on the FLX4, though PAD FX and SAMPLER light. The pads themselves work.
 - **Hot cue pad LEDs**: pads do not light to show which cues are set. Needs decoding of the firmware's panel LED stream over the emulated SPI FIFOs.
+- **QUANTIZE button state**: the engine has no on/off getter (only `isDeckQuantizeAvailable` and `setQuantizeBeatValue`);
+  the per-deck on/off lives in the player UI, where `QuantizeIndicator` (0x124a7c) draws the Q indicator. Find what it
+  reads and publish it as DECK_QUANTIZE from the shim.
 - **Unmapped pad modes**: pad FX, sampler, keyboard and key shift are not mapped, as the RX3 has no direct equivalent for most of them.
 - **Device names**: SOURCE shows USB1/USB2 rather than each stick's volume label.
 - **No auto-restart**: if the player process crashes the service does not restart it; `systemctl restart rx3` is needed.

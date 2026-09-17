@@ -4,13 +4,24 @@
 #ifndef RX3_ROOT_PATH
 #define RX3_ROOT_PATH "/home/rx3/rx3-rootfs"
 #endif
+#include <stddef.h>
 #define UI_STATE RX3_ROOT_PATH "/dev/rx3-ui-state"
 #define UI_CONTROL RX3_ROOT_PATH "/dev/rx3-control"
 /* The firmware draws its screen at this size, whatever the panel. */
 #define SRC_W 1280
 #define SRC_H 800
 struct command {int key,operation,channel,value;float analog;int extra;};
-struct ui_state {unsigned magic;float level[6];unsigned pressed;unsigned headphone_cue;int cursor_x,cursor_y,cursor_visible;int page;};
+/* Shared between the presenter, the touch bridge and the control shim inside the chroot (as /dev/rx3-ui-state).
+   `deck[n]` is what the firmware's own engine says about player n (DECK_* bits), published by control-shim.c
+   every 200 ms with `state_seq` bumped each time; the presenter treats the flags as unknown when that stops.
+   control-shim.c cannot include this header (-nostdlib build), so it writes the last three words at byte 52. */
+struct ui_state {unsigned magic;float level[6];unsigned pressed;unsigned headphone_cue;int cursor_x,cursor_y,cursor_visible;int page;
+ unsigned deck[2];unsigned state_seq;};
+#define DECK_PLAYING 1
+#define DECK_MASTER_TEMPO 2
+#define DECK_QUANTIZE 4
+#define UI_STATE_DECK_OFFSET 52
+_Static_assert(offsetof(struct ui_state,deck)==UI_STATE_DECK_OFFSET,"control-shim.c writes the deck flags at this offset");
 /* The button strip: BUTTON_ROWS rows of BUTTON_COLS cells under the content area, showing one *page* of buttons at a
    time. The main page has navigation on row 1 and the decks on row 2; DECK 1 / DECK 2 switch to a page with that deck's
    toggles and a BACK that returns to the main page. A page button sends nothing to the firmware. An entry with no label
@@ -22,8 +33,9 @@ struct ui_state {unsigned magic;float level[6];unsigned pressed;unsigned headpho
 #define BUTTON_ROWS 2
 #define NBUTTONS (BUTTON_COLS*BUTTON_ROWS)     /* cells per page */
 /* `brief` is drawn instead of `label` when the cell is too narrow for the full text even at the smallest font.
-   `page` >= 0 makes the button switch the strip to that page instead of sending `key`. */
-struct button {const char *label,*brief;int key,channel,scroll,hold,page;unsigned color;};
+   `page` >= 0 makes the button switch the strip to that page instead of sending `key`.
+   `light` is a DECK_* bit: the button is drawn lit while the engine reports it set for `channel`. */
+struct button {const char *label,*brief;int key,channel,scroll,hold,page,light;unsigned color;};
 enum {PAGE_MAIN,PAGE_DECK1,PAGE_DECK2,NPAGES};
 #define C_NAV 0x08699c
 #define C_SET 0x4b3a6d
@@ -32,24 +44,25 @@ enum {PAGE_MAIN,PAGE_DECK1,PAGE_DECK2,NPAGES};
 #define C_STOP 0x7a2f2f
 #define C_PLAY 0x12623a
 #define C_DECK 0x5a4a1f
-#define KEY(l,b,k,ch,col) {l,b,k,ch,0,0,-1,col}
-#define EMPTY {0,0,0,0,0,0,-1,0}
+#define KEY(l,b,k,ch,col) {l,b,k,ch,0,0,-1,0,col}
+#define LIT(l,b,k,ch,bit,col) {l,b,k,ch,0,0,-1,bit,col}
+#define EMPTY {0,0,0,0,0,0,-1,0,0}
 static const struct button main_buttons[]={
  KEY("SOURCE",0,0x201,0,C_NAV),KEY("BROWSE",0,0x202,0,C_NAV),KEY("SHORTCUT",0,0x210,0,C_SET),KEY("SEARCH",0,0x205,0,C_SET),
- {"UTILITY",0,0x206,0,0,1,-1,C_SET},KEY("BACK",0,0x420d,0,C_KEY),{"UP",0,0x420c,0,-1,0,-1,C_KEY},{"DOWN",0,0x420c,0,1,0,-1,C_KEY},
+ {"UTILITY",0,0x206,0,0,1,-1,0,C_SET},KEY("BACK",0,0x420d,0,C_KEY),{"UP",0,0x420c,0,-1,0,-1,0,C_KEY},{"DOWN",0,0x420c,0,1,0,-1,0,C_KEY},
  KEY("ENTER",0,0x420c,0,C_KEY),EMPTY,
- KEY("LOAD 1",0,0x4311,1,C_LOAD),KEY("USB STOP 1 (hold)","EJECT 1",0x8002,1,C_STOP),KEY("PLAY / PAUSE 1","PLAY 1",0x4101,1,C_PLAY),
- {"DECK 1",0,0,0,0,0,PAGE_DECK1,C_DECK},EMPTY,
- KEY("LOAD 2",0,0x4311,2,C_LOAD),KEY("USB STOP 2 (hold)","EJECT 2",0x8002,2,C_STOP),KEY("PLAY / PAUSE 2","PLAY 2",0x4101,2,C_PLAY),
- {"DECK 2",0,0,0,0,0,PAGE_DECK2,C_DECK}
+ KEY("LOAD 1",0,0x4311,1,C_LOAD),KEY("USB STOP 1 (hold)","EJECT 1",0x8002,1,C_STOP),LIT("PLAY / PAUSE 1","PLAY 1",0x4101,1,DECK_PLAYING,C_PLAY),
+ {"DECK 1",0,0,0,0,0,PAGE_DECK1,0,C_DECK},EMPTY,
+ KEY("LOAD 2",0,0x4311,2,C_LOAD),KEY("USB STOP 2 (hold)","EJECT 2",0x8002,2,C_STOP),LIT("PLAY / PAUSE 2","PLAY 2",0x4101,2,DECK_PLAYING,C_PLAY),
+ {"DECK 2",0,0,0,0,0,PAGE_DECK2,0,C_DECK}
 };
 static const struct button deck1_buttons[]={
- KEY("MASTER TEMPO 1","MT 1",0x4108,1,C_DECK),KEY("QUANTIZE 1","Q 1",0x410b,1,C_DECK),EMPTY,EMPTY,EMPTY,EMPTY,EMPTY,EMPTY,EMPTY,
- {"BACK",0,0,0,0,0,PAGE_MAIN,C_KEY}
+ LIT("MASTER TEMPO 1","MT 1",0x4108,1,DECK_MASTER_TEMPO,C_DECK),LIT("QUANTIZE 1","Q 1",0x410b,1,DECK_QUANTIZE,C_DECK),EMPTY,EMPTY,EMPTY,EMPTY,EMPTY,EMPTY,EMPTY,
+ {"BACK",0,0,0,0,0,PAGE_MAIN,0,C_KEY}
 };
 static const struct button deck2_buttons[]={
- KEY("MASTER TEMPO 2","MT 2",0x4108,2,C_DECK),KEY("QUANTIZE 2","Q 2",0x410b,2,C_DECK),EMPTY,EMPTY,EMPTY,EMPTY,EMPTY,EMPTY,EMPTY,
- {"BACK",0,0,0,0,0,PAGE_MAIN,C_KEY}
+ LIT("MASTER TEMPO 2","MT 2",0x4108,2,DECK_MASTER_TEMPO,C_DECK),LIT("QUANTIZE 2","Q 2",0x410b,2,DECK_QUANTIZE,C_DECK),EMPTY,EMPTY,EMPTY,EMPTY,EMPTY,EMPTY,EMPTY,
+ {"BACK",0,0,0,0,0,PAGE_MAIN,0,C_KEY}
 };
 struct page {const struct button *buttons;int n;};
 #define PAGE(t) {t,(int)(sizeof(t)/sizeof*(t))}

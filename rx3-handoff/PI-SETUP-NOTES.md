@@ -175,6 +175,15 @@ changing anything. Note that `uhubctl` lives in `/usr/sbin`, off a normal user's
 - Colour FX: keys 0x50a1..0x50a6 are normal press/release (op 0/2) but **must carry the mixer channel (1/2)**; global
   (ch 0) and op 5 do nothing. 0x509d colour knob works with op 4. Verified with `rx3-control.py query`
   (engine getters: route, crossfader assign, fader, trim, cfx type/colour, playing, tempo, realmixer). FILTER = type 1.
+- **Deck state on the buttons** (2026-09-17): `control-shim.c` runs a second thread that every 200 ms calls
+  `DjEngineIF::isPlaying(ch)` (0x45984) and `isMasterTempo(ch)` (0x46354, from `nm -C` on the unstripped rbp) and
+  `pwrite`s two flag words + a sequence counter at byte 52 of `/dev/rx3-ui-state` (the presenter's mmap; the shim is
+  built -nostdlib so it cannot include pi-controls.h, hence the fixed offset with a `_Static_assert` on the other side).
+  The presenter draws PLAY and MASTER TEMPO lit (paler + bright bottom bar) while the flags say so, and treats them as
+  unknown when the counter stops moving for 2 s. Rebuilding the shim = the one gcc line in build-rootfs.sh ("== shim"),
+  no need to rebuild the chroot. QUANTIZE: no engine getter (`isDeckQuantizeAvailable` is availability, not on/off;
+  `setQuantizeBeatValue` sets the utility value); the per-deck on/off is in the player UI - `QuantizeIndicator` 0x124a7c
+  draws it, `CmnFunc_CmnInfo_GetUtilityQuantizeValue` 0x17fcf4 is the utility beat value. Still to locate.
 - `rx3-control.py query` dumps engine state via the control shim (key 0xFFFF) to `/tmp/rx3-query.txt` in the chroot; the
   getters need the DjEngineIF instance (global 0x011492d8) as `this` — passing NULL crashes the player.
 - **USB STOP (0x8002)**: send a plain press (code 0) and release (code 2) on channel = slot (1 = USB1, 2 = USB2); the

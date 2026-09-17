@@ -69,7 +69,23 @@ static void *control_thread(void *unused){
  }
  return 0;
 }
+/* Deck state for the on-screen buttons: every 200 ms ask the engine's own getters and publish the answers into the
+   presenter's shared state file (struct ui_state in pi-controls.h: deck[2] then state_seq, at byte 52 - this file is
+   built without libc headers, so the offset is spelled out). Bits: 1 playing, 2 master tempo, 4 quantize (quantize is
+   a player-UI setting, not an engine one; still to be located). Getters take the DjEngineIF instance as `this`. */
+static void *state_thread(void *unused){
+ int (*playing)(void*,int)=(void*)0x45984,(*mtempo)(void*,int)=(void*)0x46354;   /* isPlaying(ch), isMasterTempo(ch) */
+ while(!*(void *volatile *)0x011492d8||!*(void *volatile *)0x011493c0)sleep(1);
+ sleep(5);
+ int fd;while((fd=open("/dev/rx3-ui-state",O_WRONLY))<0)sleep(1);   /* the presenter creates it */
+ unsigned seq=0;
+ for(;;){void *eng=*(void **)0x011492d8;unsigned st[3];
+  for(int i=0;i<2;i++)st[i]=((playing(eng,i)&0xff)?1:0)|((mtempo(eng,i)&0xff)?2:0);
+  st[2]=++seq;pwrite(fd,st,sizeof st,52);usleep(200000);}
+ return 0;
+}
 __attribute__((constructor))static void start_control(void){
  if(!program_invocation_short_name||strcmp(program_invocation_short_name,"rbp-pi"))return;
  unsigned long thread;pthread_create(&thread,0,control_thread,0);
+ unsigned long state;pthread_create(&state,0,state_thread,0);
 }
