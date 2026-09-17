@@ -51,12 +51,13 @@ static int state_fresh(const struct ui_state*st){static unsigned seen;static lon
 static void draw_strip(const struct ui*u,int p){uint32_t *live=frame;frame=chrome;
  box(u->sx,u->sy,u->sw,u->sh,0x101820);for(int i=0;i<pages[p].n;i++)drawbutton(u,p,i,0,0);frame=live;}
 /* Slider i from its 160x333 design box (slider_box gives the origin and scale; the touch bridge inverts the same numbers). */
-static void drawslider(const struct ui*u,int i,const struct ui_state*st){
+static void drawslider(const struct ui*u,int i,const struct ui_state*st,int fresh){
  int x,y;double s;slider_box(u,i,&x,&y,&s);
 #define D(v) ((int)((v)*s+.5))
  float n=st->level[i];if(n<0)n=0;if(n>1)n=1;int h=D(180*n);
  box(x+D(70),y+D(85),D(20),D(180),0x35434e);box(x+D(70),y+D(265)-h,D(20),h,0x199feb);box(x+D(30),y+D(257)-h,D(100),D(16),0xeaf3fa);
- if(i==0||i==3){unsigned bit=i==0?1:2;box(x+D(8),y+D(43),D(144),D(32),st->headphone_cue&bit?0x126db0:0x35434e);label(x+D(80),y+D(60),"HP CUE",D(19),0xffffff);}
+ if(i==0||i==3){int ch=i==0?0:1;int on=fresh?(st->deck[ch]&DECK_HP_CUE)!=0:(st->headphone_cue>>ch)&1;   /* engine truth when published, else the touch toggle */
+  box(x+D(8),y+D(43),D(144),D(32),on?0x126db0:0x35434e);label(x+D(80),y+D(60),"HP CUE",D(19),0xffffff);}
  char val[24];snprintf(val,sizeof(val),"%d%%",(int)(n*100+.5));label(x+D(80),y+D(305),val,D(25),0xd1dae2);
 #undef D
 }
@@ -118,12 +119,13 @@ int main(int argc,char**argv){
   else{const uint32_t *in2=row[y]+1<SRC_H?in+SRC_W:in;
    for(int x=0;x<u.cw;x++){int c=col[x],c2=c+1<SRC_W?c+1:c;uint32_t a=in[c],b=in[c2],e=in2[c],g=in2[c2];
     out[x]=((a>>2)&0x3f3f3f)+((b>>2)&0x3f3f3f)+((e>>2)&0x3f3f3f)+((g>>2)&0x3f3f3f);}}}   /* per-channel mean, no carry between channels */
- if(u.sh){int fresh=state_fresh(state);for(int i=0;i<pages[pg].n;i++){const struct button*b=&pages[pg].buttons[i];int down=state->pressed&(1u<<i);
+ int fresh=state_fresh(state);
+ if(u.sh){for(int i=0;i<pages[pg].n;i++){const struct button*b=&pages[pg].buttons[i];int down=state->pressed&(1u<<i);
   int lit=fresh&&b->light&&b->channel>=1&&b->channel<=2&&(state->deck[b->channel-1]&b->light);if(down||lit)drawbutton(&u,pg,i,down,lit);}}
  if(state->cursor_visible){int cx=state->cursor_x,cy=state->cursor_y;   /* arrow pointer: black outline, white fill */
   for(int y=0;y<22;y++)for(int x=0;x<=y&&x<16;x++){int px=cx+x,py=cy+y;if(px<0||px>=UW||py<0||py>=UH)continue;
    int edge=(x==0||x==y||y==21||x==15);frame[py*UW+px]=edge?0x000000:0xffffff;}}
- if(u.bw)for(int i=0;i<6;i++)drawslider(&u,i,state);
+ if(u.bw)for(int i=0;i<6;i++)drawslider(&u,i,state,fresh);
  for(int py=0;py<H;py++){const int *m=idx+py*W;unsigned char *line=d+py*f.line_length;
   if(bpp16){uint16_t*row16=(uint16_t*)line;for(int px=0;px<W;px++){uint32_t c=frame[m[px]];row16[px]=(uint16_t)(((c>>8)&0xf800)|((c>>5)&0x07e0)|((c>>3)&0x001f));}}
   else{uint32_t*row32=(uint32_t*)line;for(int px=0;px<W;px++)row32[px]=frame[m[px]];}}

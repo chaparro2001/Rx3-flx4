@@ -96,7 +96,6 @@ def note(status, n, vel):
             press(K['jogtouch'], deck, down); return
         if name == 'hpcue': press(K['hpcue'], deck, down); return
         if name: press(K[name], deck, down); return
-    if ch in (0, 1) and n == 0x54 and down: hp_cue[ch + 1] = not hp_cue[ch + 1]; led(status, 0x54, hp_cue[ch + 1])
     if ch in (4, 5):                        # BEAT FX section
         global beatfx_index
         if n == 0x47: press(K['fxonoff'], 0, down); return
@@ -191,7 +190,7 @@ PAD_MODES = [0x1B, 0x6D, 0x20, 0x22, 0x1E, 0x6B, 0x69, 0x6F]   # hot cue, beat l
 RX3_PAD_MODES = {0x1B: 'hotcue', 0x20: 'beatjump', 0x6D: 'autobeatloop'}   # the ones the RX3 has, and its key for each
 pad_mode = {1: 0x1B, 2: 0x1B}
 rx3_mode = {1: 'hotcue', 2: 'hotcue'}          # what the firmware is in (hotcue / beatjump / autobeatloop); HOT CUE at power-on
-hp_cue = {1: True, 2: False}                                 # control-shim.c enables deck 1 cue at startup
+hp_cue = {1: True, 2: False}                                 # what control-shim.c sets at startup; the real state follows from ui_state
 def show_pad_mode(deck):
     for n in PAD_MODES: led(0x90 + deck - 1, n, n == pad_mode[deck])
 def init_leds():
@@ -202,10 +201,12 @@ threading.Thread(target=init_leds, daemon=True).start()
 # ---- PLAY / CUE LEDs from the firmware's own deck state -------------------------------------------------------
 # control-shim.c publishes, every 200 ms, one flag word per deck (bit 1 playing, 2 master tempo, 4 quantize) plus a
 # sequence counter at byte 52 of the shared ui_state file (struct ui_state in pi-controls.h). PLAY lights while the
-# deck plays and CUE while it is stopped, as on a CDJ; both go dark when the counter stops moving (player gone).
+# deck plays and CUE while it is stopped, as on a CDJ; the headphone CUE button (0x54) follows bit 8, the mixer channel's
+# real headphone-cue state, so the screen's HP CUE, the FLX4 and the firmware can no longer disagree. All go dark when
+# the counter stops moving (player gone).
 UI_STATE = ROOT + '/dev/rx3-ui-state'
 def deck_state_watch():
-    shown = {1: None, 2: None}; last_seq = None; last_change = time.time()
+    shown = {1: None, 2: None}; shown_hp = {1: None, 2: None}; last_seq = None; last_change = time.time()
     while True:
         time.sleep(0.1)
         try:
@@ -217,9 +218,11 @@ def deck_state_watch():
         fresh = time.time() - last_change < 2.0
         for deck, flags in ((1, d1), (2, d2)):
             playing = bool(flags & 1) if fresh else None
-            if playing == shown[deck]: continue
-            shown[deck] = playing
-            led(0x90 + deck - 1, 0x0B, playing is True); led(0x90 + deck - 1, 0x0C, playing is False)
+            if playing != shown[deck]:
+                shown[deck] = playing
+                led(0x90 + deck - 1, 0x0B, playing is True); led(0x90 + deck - 1, 0x0C, playing is False)
+            hp = bool(flags & 8) if fresh else False
+            if hp != shown_hp[deck]: shown_hp[deck] = hp; led(0x90 + deck - 1, 0x54, hp)
 threading.Thread(target=deck_state_watch, daemon=True).start()
 
 # ---- Sound Color FX: the RX3 needs an effect selected before the per-channel COLOR knobs do anything ----

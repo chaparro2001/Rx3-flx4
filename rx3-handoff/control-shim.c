@@ -71,18 +71,19 @@ static void *control_thread(void *unused){
 }
 /* Deck state for the on-screen buttons: every 200 ms ask the firmware's own getters and publish the answers into the
    presenter's shared state file (struct ui_state in pi-controls.h: deck[2] then state_seq, at byte 52 - this file is
-   built without libc headers, so the offset is spelled out). Bits: 1 playing, 2 master tempo, 4 quantize.
+   built without libc headers, so the offset is spelled out). Bits: 1 playing, 2 master tempo, 4 quantize, 8 headphone cue.
    Playing and master tempo are DjEngineIF getters (the instance as `this`); quantize on/off is a player-UI setting,
    read the way the firmware's own Q indicator does: QuantizeIndicator (0x124a7c) calls UiGetPlayQuantizeOn(deck). */
 static void *state_thread(void *unused){
  int (*playing)(void*,int)=(void*)0x45984,(*mtempo)(void*,int)=(void*)0x46354;   /* isPlaying(ch), isMasterTempo(ch) */
  int (*quantize)(int)=(void*)0xfd36c;                                             /* UiGetPlayQuantizeOn(deck) */
+ int (*hpcue)(void*,int)=(void*)0x4eecc;                                          /* getMixerChHeadphoneCue(input) */
  while(!*(void *volatile *)0x011492d8||!*(void *volatile *)0x011493c0)sleep(1);
  sleep(5);
  int fd;while((fd=open("/dev/rx3-ui-state",O_WRONLY))<0)sleep(1);   /* the presenter creates it */
  unsigned seq=0;
  for(;;){void *eng=*(void **)0x011492d8;unsigned st[3];
-  for(int i=0;i<2;i++)st[i]=((playing(eng,i)&0xff)?1:0)|((mtempo(eng,i)&0xff)?2:0)|(quantize(i)?4:0);
+  for(int i=0;i<2;i++)st[i]=((playing(eng,i)&0xff)?1:0)|((mtempo(eng,i)&0xff)?2:0)|(quantize(i)?4:0)|((hpcue(eng,i)&0xff)?8:0);
   st[2]=++seq;pwrite(fd,st,sizeof st,52);usleep(200000);}
  return 0;
 }

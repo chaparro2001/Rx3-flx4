@@ -7,6 +7,7 @@ usage: rx3-control.py mount [usb1|usb2] [chroot-path]
        rx3-control.py release <keyname> [channel] (release only)
        rx3-control.py hold <keyname> [channel]    (press + "long-pressed" + release)
        rx3-control.py utility                     (= hold menu: the UTILITY screen)
+       rx3-control.py state                       (what the control shim publishes about each deck)
 """
 import os,struct,time,sys
 import rx3_env
@@ -30,6 +31,12 @@ if a[0] in ('mount','umount','remount'):
     if a[0] in ('umount','remount'): fifo('udev_'+port,'umount '+path); time.sleep(1); fifo('udev_usbctn'+n,'disconnect'); time.sleep(2)
     if a[0] in ('mount','remount'): fifo('udev_usbctn'+n,'connect'); time.sleep(1.5); fifo('udev_'+port,'mount '+path)
     sys.exit(0)
+if a[0]=='state':
+    # struct ui_state (pi-controls.h): the shim's deck flags and sequence counter sit at byte 52
+    with open(root+'/dev/rx3-ui-state','rb') as st: st.seek(52); d1,d2,seq=struct.unpack('<III',st.read(12))
+    names=[(1,'playing'),(2,'master tempo'),(4,'quantize'),(8,'headphone cue')]
+    for d,f in ((1,d1),(2,d2)): print('deck %d: %s'%(d,', '.join(n for b,n in names if f&b) or '-'))
+    print('sequence %d (run twice: if it does not move, the shim is not publishing)'%seq); sys.exit(0)
 if a[0]=='query':
     f=os.open(root+'/dev/rx3-control',os.O_RDWR|os.O_NONBLOCK); os.write(f,struct.pack('<iiiifi',0xFFFF,0,0,0,0.0,0)); os.close(f); time.sleep(0.3)
     print(open(root+'/tmp/rx3-query.txt').read(),end=''); sys.exit(0)
