@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 """Find out, on the controller itself, which MIDI messages light which LEDs (and which button sends which note).
 
-Stops nothing by itself: the pointer/controller bridges must not be holding the MIDI device, so run
-    sudo systemctl stop rx3
-first (the probe refuses to start while controller-bridge.py is running). It sends the controller's keep-alive
-itself, prints every message the controller sends (press a button to learn its note), and takes commands:
+Two ways to run it:
+  - with the player stopped (sudo systemctl stop rx3): the probe owns the device, sends the controller's keep-alive
+    itself and prints every message the controller sends (press a button to learn its note);
+  - alongside a running controller-bridge.py: the probe only writes, sharing the output the way ALSA allows
+    (O_APPEND), and leaves keep-alive and input to the bridge - enough for lighting LEDs, no button echo.
+Commands:
 
     on  <ch> <note> [vel]    note-on  on channel ch (0-15), velocity vel (default 7F)   e.g.  on 0 1B
     off <ch> <note>          note-on with velocity 0                                      e.g.  off 0 69
@@ -22,8 +24,8 @@ import controllers
 
 def die(m): print('led-probe: ' + m, file=sys.stderr); sys.exit(1)
 
-if subprocess.run(['pgrep', '-f', r'^python3 \S*controller-bridge\.py'], capture_output=True).returncode == 0:   # anchored: a shell holding this text must not match
-    die('controller-bridge.py is running and owns the MIDI device: sudo systemctl stop rx3 first')
+# anchored pattern: a shell whose command line merely contains this text must not match
+alongside = subprocess.run(['pgrep', '-f', r'^python3 \S*controller-bridge\.py'], capture_output=True).returncode == 0
 found = controllers.detect()
 forced = os.environ.get('RX3_CONTROLLER')          # RX3_CONTROLLER=flx4 led-probe.py /dev/snd/midiC1D0 when detection fails
 if forced and forced not in controllers.CONTROLLERS: die('RX3_CONTROLLER=%s is not one of %s' % (forced, ', '.join(controllers.CONTROLLERS)))
@@ -35,14 +37,16 @@ if not dev:
         % (', '.join(c['name'] for c in controllers.CONTROLLERS.values()), ', '.join(cards) or 'none'))
 print('led-probe: %s on %s' % (ctl['name'] if ctl else 'unknown controller', dev))
 
-out = os.open(dev, os.O_WRONLY)
+try: out = os.open(dev, os.O_WRONLY | (os.O_APPEND if alongside else 0))
+except OSError as e: die('cannot open %s for writing: %s%s' % (dev, e, ' (stop the player: sudo systemctl stop rx3)' if alongside else ''))
+if alongside: print('led-probe: controller-bridge.py is running - writing alongside it (its keep-alive and input stay with it; no button echo here)')
 lock = threading.Lock()
 def send(b, echo=True):
     with lock: os.write(out, bytes(b))
     if echo: print('  -> ' + ' '.join('%02X' % x for x in b))
 
-if ctl and ctl['init']: send(ctl['init'], echo=False)
-if ctl and ctl['keepalive']:
+if ctl and ctl['init'] and not alongside: send(ctl['init'], echo=False)
+if ctl and ctl['keepalive'] and not alongside:
     def keepalive():
         while True: send(ctl['keepalive'], echo=False); time.sleep(ctl['keepalive_period'])
     threading.Thread(target=keepalive, daemon=True).start()
@@ -63,7 +67,7 @@ def listen():
                 kind, ch, d1, d2 = s & 0xF0, s & 0x0F, buf[1], buf[2]; buf = buf[3:]
                 what = {0x90: 'note-on ', 0x80: 'note-off', 0xB0: 'cc      '}.get(kind, '%02X      ' % kind)
                 print('  <- %s ch %X  %02X %02X   (raw %02X %02X %02X)' % (what, ch, d1, d2, s, d1, d2), flush=True)
-threading.Thread(target=listen, daemon=True).start()
+if not alongside: threading.Thread(target=listen, daemon=True).start()
 
 def h(x): return int(x, 16)
 print('commands: on/off/cc/raw/sweep/alloff/q  (hex numbers; help in the file header)')
