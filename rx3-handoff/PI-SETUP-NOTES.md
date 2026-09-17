@@ -136,6 +136,11 @@ changing anything. Note that `uhubctl` lives in `/usr/sbin`, off a normal user's
 - **DDJ-FLX4 keep-alive**: the controller stops sending MIDI (and its outputs go silent) unless the host sends the vendor
   SysEx `F0 00 40 05 00 00 04 05 00 50 02 F7` every ~200 ms (rekordbox/Mixxx do this). `flx4-bridge.py` now sends it from a
   thread; it also exits when the MIDI device disappears so the hot-plug rule restarts everything on re-plug.
+- **FLX4 LEDs, measured with led-probe.py (2026-09-17)**: the pad mode LEDs answer to their own note on the deck channel
+  (90/91), 0x7F on / 0 off: 1B HOT CUE, 1E PAD FX 1, 20 BEAT JUMP, 22 SAMPLER. The shifted modes' notes (69, 6B, 6D, 6F)
+  do NOT affect those LEDs. Pads in SAMPLER mode send 97 70..77 (hot cue 00..07, beat jump 20..27, beat loop 60..67);
+  `on 7 00 7F` and `sweep 7 00 07` lit no pad, so pad LED addressing is still unknown. The dark HOT CUE / BEAT JUMP
+  LEDs were a bridge bug: those notes sat in DECK_NOTES and were dispatched as plain keys before the pad-mode code ran.
 - (2026-09-14) FLX4 attached at Pi power-on comes up LIT BUT SILENT on USB: no enumeration attempt at all in the
   kernel log, and no uhubctl cycle (2/8/20 s) revives it because the Pi 5 has no per-port VBUS switching
   ("off" only disables the port). Worse, a boot-time uhubctl cycle on the USB3 root hub made a USB3 stick

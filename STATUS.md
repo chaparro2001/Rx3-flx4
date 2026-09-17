@@ -33,14 +33,17 @@
 - Beat FX: on/off, type select, channel select, beat length, depth.
 - Colour FX knobs with the DJ filter selected, plus SMART CFX cycling.
 - Vendor keep-alive so the controller never drops MIDI or mutes itself.
+- Pad mode buttons light to show the selected mode (fixed 2026-09-17: HOT CUE and BEAT JUMP were being handled as plain
+  keys before the LED code ran; measured on the FLX4 that every mode LED answers to its own note). Untested since the fix.
 
 **Host**
 - Wi-Fi and Ethernet, SSH key login, controller re-enumeration after power glitches.
 
 ## Work in progress
 
-- **Pad mode LEDs**: the HOT CUE and BEAT JUMP buttons stay dark on the FLX4, though PAD FX and SAMPLER light. The pads themselves work.
-- **Hot cue pad LEDs**: pads do not light to show which cues are set. Needs decoding of the firmware's panel LED stream over the emulated SPI FIFOs.
+- **Hot cue pad LEDs**: pads do not light to show which cues are set. The FLX4 side is being measured with
+  `led-probe.py` (the pad LEDs do not answer on channel 7 notes 0-7); the firmware side needs the getter for the loaded
+  track's hot cues, to be published through ui_state like the deck flags.
 - **Unmapped pad modes**: pad FX, sampler, keyboard and key shift are not mapped, as the RX3 has no direct equivalent for most of them.
 - **Device names**: SOURCE shows USB1/USB2 rather than each stick's volume label.
 - **No auto-restart**: if the player process crashes the service does not restart it; `systemctl restart rx3` is needed.

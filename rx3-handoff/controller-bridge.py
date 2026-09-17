@@ -42,11 +42,11 @@ def analog(key, ch, v): send(key, 4, ch, 0, v)
 
 # ---- MIDI note -> (key, channel-kind) for deck note channels (0x90/0x91) ----
 DECK_NOTES = {0x0B: 'play', 0x0C: 'cue', 0x3F: 'shift', 0x10: 'loopin', 0x11: 'loopout', 0x4D: 'reloop',
-              0x58: 'sync', 0x5C: 'master', 0x60: 'temporange', 0x54: 'hpcue', 0x36: 'jogtouch',
-              0x1B: 'hotcue', 0x6D: 'autobeatloop', 0x20: 'beatjump', 0x68: 'quantize',
+              0x58: 'sync', 0x5C: 'master', 0x60: 'temporange', 0x54: 'hpcue', 0x36: 'jogtouch', 0x68: 'quantize',
               0x40: 'searchfwd', 0x3D: 'searchfwd', 0x3E: 'searchrev', 0x51: 'callprev', 0x53: 'callnext'}
 # SHIFT+PLAY (censor) is added per controller at start-up: 0x0E on the FLX4, 0x47 on the DDJ-400.
-# 0x1B hot cue mode, 0x6D beat loop mode, 0x20 beat jump mode select the pad mode on the RX3 too.
+# The pad mode buttons (PAD_MODES below) are handled before this table: they drive the mode LEDs and forward the RX3's
+# HOT CUE / BEAT JUMP / BEAT LOOP key only when the mode actually changes.
 MIXER_NOTES = {0x46: ('load', 1), 0x47: ('load', 2), 0x41: ('rotary_press', 0), 0x42: ('back', 0)}
 DECK_CC_14 = {0x00: 'tempo'}                       # MSB 0x00 + LSB 0x20 (14-bit)
 DECK_CC = {0x04: 'trim', 0x07: 'eqh', 0x0B: 'eqm', 0x0F: 'eql', 0x13: 'fader'}
@@ -72,27 +72,21 @@ def note(status, n, vel):
     ch = status & 0x0F; down = (status & 0xF0) == 0x90 and vel > 0
     if ch in (0, 1):
         deck = ch + 1
+        if n in PAD_MODES:
+            # Pad mode buttons: light the one pressed (measured on the FLX4 with led-probe.py: each mode LED answers
+            # to its own note, 0x7F on / 0 off, and nothing else touches it), then forward the RX3's own mode key only
+            # when its mode must change - its HOT CUE key toggles HOT CUE <-> GATE CUE on a repeat press.
+            if not down: return
+            pad_mode[deck] = n; show_pad_mode(deck)
+            want = RX3_PAD_MODES.get(n)
+            if want is None or rx3_mode[deck] == want: return    # pad fx / sampler / keyboard / key shift: no RX3 equivalent
+            rx3_mode[deck] = want; press(K[want], deck, True); press(K[want], deck, False); return
         name = DECK_NOTES.get(n)
         if name == 'jogtouch':
             if not down: jog_stop(deck)     # the RX3 needs a zero jog report or Play stays blocked after a scratch
             press(K['jogtouch'], deck, down); return
         if name == 'hpcue': press(K['hpcue'], deck, down); return
         if name: press(K[name], deck, down); return
-    if ch in (0, 1) and n in PAD_MODES:
-        deck = ch + 1
-        if not down: return
-        pad_mode[deck] = n; show_pad_mode(deck)
-        # Forward to the RX3 only when its own pad mode must change. Its HOT CUE key toggles HOT CUE <-> GATE CUE.
-        if n == 0x1B:
-            if rx3_mode[deck] == 'hotcue': return
-            rx3_mode[deck] = 'hotcue'
-        elif n == 0x20:
-            if rx3_mode[deck] == 'beatjump': return
-            rx3_mode[deck] = 'beatjump'
-        elif n == 0x6D:
-            if rx3_mode[deck] == 'beatloop': return
-            rx3_mode[deck] = 'beatloop'
-        else: return                        # pad fx / sampler / keyboard / key shift have no RX3 equivalent
     if ch in (0, 1) and n == 0x54 and down: hp_cue[ch + 1] = not hp_cue[ch + 1]; led(status, 0x54, hp_cue[ch + 1])
     if ch in (4, 5):                        # BEAT FX section
         global beatfx_index
@@ -184,9 +178,10 @@ if CTL['keepalive']:
 def led(status, note, on):
     midi_write(bytes([status, note, 0x7F if on else 0x00]))
     if LOG: print('%s led %02x %02x %s' % (time.strftime('%H:%M:%S'), status, note, 'on' if on else 'off'), flush=True)
-PAD_MODES = [0x1B, 0x6D, 0x20, 0x22, 0x1E, 0x69, 0x6F]      # hot cue, beat loop, beat jump, sampler, pad fx1, keyboard, key shift
+PAD_MODES = [0x1B, 0x6D, 0x20, 0x22, 0x1E, 0x6B, 0x69, 0x6F]   # hot cue, beat loop, beat jump, sampler, pad fx1, pad fx2, keyboard, key shift
+RX3_PAD_MODES = {0x1B: 'hotcue', 0x20: 'beatjump', 0x6D: 'autobeatloop'}   # the ones the RX3 has, and its key for each
 pad_mode = {1: 0x1B, 2: 0x1B}
-rx3_mode = {1: 'hotcue', 2: 'hotcue'}          # what the firmware is in (hotcue / beatjump / beatloop)
+rx3_mode = {1: 'hotcue', 2: 'hotcue'}          # what the firmware is in (hotcue / beatjump / autobeatloop); HOT CUE at power-on
 hp_cue = {1: True, 2: False}                                 # control-shim.c enables deck 1 cue at startup
 def show_pad_mode(deck):
     for n in PAD_MODES: led(0x90 + deck - 1, n, n == pad_mode[deck])
