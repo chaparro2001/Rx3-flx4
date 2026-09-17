@@ -40,6 +40,9 @@
 - LOOP IN / LOOP OUT / RELOOP light as on a CDJ (in point set or looping / looping / a loop to return to), from
   `isLooping` and `isPossibleToReLoop`; the "in point set, no loop yet" stretch is the bridge's own note of the
   LOOP IN press. Verified on the FLX4 2026-09-17.
+- SYNC and MASTER light from `isSyncOn` / `getSyncMaster`, and the channel level meters follow the engine's own dB
+  reading (`getInputChLevelMono`, -24..+10 dB mapped to the meter; `RX3_METER_MIN` / `RX3_METER_MAX` adjust). Verified
+  on the FLX4 2026-09-17. `led-probe.py` can now run alongside the bridge to test LEDs without stopping the player.
 
 **Host**
 - Wi-Fi and Ethernet, SSH key login, controller re-enumeration after power glitches.
@@ -47,8 +50,7 @@
 ## Work in progress
 
 - **Unlit FLX4 buttons**: SLIP and BEAT FX ON/OFF do not reflect state yet; their getters still need finding. Same path
-  as the rest: shim bit, bridge LED. SYNC and MASTER were added 2026-09-17 (`isSyncOn`, `getSyncMaster` +
-  `isSyncMasterValid`), untested on the FLX4.
+  as the rest: shim bit, bridge LED.
 - **Unmapped pad modes**: pad FX, sampler, keyboard and key shift are not mapped, as the RX3 has no direct equivalent for most of them.
 - **Device names**: SOURCE shows USB1/USB2 rather than each stick's volume label.
 - **No auto-restart**: if the player process crashes the service does not restart it; `systemctl restart rx3` is needed.
