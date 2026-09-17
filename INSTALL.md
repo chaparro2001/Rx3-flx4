@@ -114,6 +114,10 @@ watcher does, and it keeps running even when the player is stopped:
 
 **Logs.** `./rx3-logs.sh` follows the player, the USB helpers and the kernel in one stream.
 
+**Controller LEDs.** `python3 led-probe.py` (with the player stopped: `sudo systemctl stop rx3`) talks to the
+DJ controller directly: it prints the note of every button you press and lights LEDs on command (`on 0 1B`,
+`off 0 69`, `sweep 7 00 0F`), so a controller's LED map can be measured on the device instead of guessed.
+
 **Cleaning up a previous install.** `./install.sh clean` removes everything an earlier install put on the
 machine (units, udev rules, the chroot, the USB overlay layers, binaries, logs) and keeps the recovered
 firmware; `./install.sh clean --all` removes that too. Run it before reinstalling if things behave oddly.
