@@ -23,9 +23,14 @@ static void command(int key,int op,int ch,int value,float a){struct command c={k
    unmounted immediately) until the button is tapped once. */
 /* UTILITY is the panel's MENU key held down: press, then operation 1 ("long-pressed"), then release. The 1 goes out
    right after the press so a tap is enough, and never on its own (see the USB STOP note above). */
+/* CLOSE stops the player once it has been held for a second, so a stray touch cannot end a set. Released early, nothing. */
+static long close_since;
 static void button(int i,int down){
  const struct button*b=&page_of(state->page)->buttons[i];if(!b->label||b->page>=0)return;
  if(down)state->pressed|=1u<<i;else state->pressed&=~(1u<<i);
+ if(b->key==CMD_CLOSE){if(down)close_since=millis();
+  else if(close_since&&millis()-close_since>=1000){fprintf(stderr,"CLOSE: stopping the player\n");if(system("systemctl stop --no-block rx3.service"))perror("CLOSE");}
+  if(!down)close_since=0;return;}
  if(b->scroll){if(down)command(b->key,4,0,b->scroll,0);return;}
  command(b->key,down?0:2,b->channel,0,0);
  if(down&&b->hold)command(b->key,1,b->channel,0,0);

@@ -272,23 +272,26 @@ sudo install -m 644 "$tmp"/*.rules /etc/udev/rules.d/ || exit 1
 sudo install -m 644 "$tmp/rx3.service" "$tmp/rx3-desktop.service" /etc/systemd/system/ || exit 1
 sudo udevadm control --reload
 sudo systemctl daemon-reload
-ok "installed udev rules and rx3.service"
-
-if [ -n "${RX3_KEEP_DESKTOP:-}" ]; then
-  # Desktop stays the default. rx3-session.sh (unit rx3-desktop) closes it, frees the audio, runs the player and
-  # brings the desktop back when the player stops; the icon starts that unit, which polkit lets wheel/sudo do.
-  echo "== desktop icon: the player only runs when it is clicked"
-  sudo systemctl disable rx3 >/dev/null 2>&1
-  systemctl --user unmask pipewire pipewire-pulse wireplumber pipewire.socket pipewire-pulse.socket 2>/dev/null
-  sudo mkdir -p /etc/polkit-1/rules.d
-  sudo tee /etc/polkit-1/rules.d/50-rx3.rules >/dev/null <<'RULE'
-// XDJ-RX3 icon: members of wheel/sudo may start the player session without a password.
+# polkit: the strip's CLOSE button (touch bridge, running as the user) stops rx3, and the XDJ-RX3 icon starts rx3-desktop.
+sudo mkdir -p /etc/polkit-1/rules.d
+sudo tee /etc/polkit-1/rules.d/50-rx3.rules >/dev/null <<'RULE'
+// XDJ-RX3: members of wheel/sudo may start the player session (icon) and stop the player (CLOSE) without a password.
 polkit.addRule(function(action, subject) {
-  if (action.id == "org.freedesktop.systemd1.manage-units" && action.lookup("unit") == "rx3-desktop.service" &&
-      action.lookup("verb") == "start" && (subject.isInGroup("wheel") || subject.isInGroup("sudo")))
+  if (action.id != "org.freedesktop.systemd1.manage-units") return;
+  var unit = action.lookup("unit"), verb = action.lookup("verb");
+  if (((unit == "rx3-desktop.service" && verb == "start") || (unit == "rx3.service" && verb == "stop")) &&
+      (subject.isInGroup("wheel") || subject.isInGroup("sudo")))
     return polkit.Result.YES;
 });
 RULE
+ok "installed udev rules, rx3.service, rx3-desktop.service and the polkit rule"
+
+if [ -n "${RX3_KEEP_DESKTOP:-}" ]; then
+  # Desktop stays the default. rx3-session.sh (unit rx3-desktop) closes it, frees the audio, runs the player and
+  # brings the desktop back when the player stops (CLOSE on the strip, or ESC held); the icon starts that unit.
+  echo "== desktop icon: the player only runs when it is clicked"
+  sudo systemctl disable rx3 >/dev/null 2>&1
+  systemctl --user unmask pipewire pipewire-pulse wireplumber pipewire.socket pipewire-pulse.socket 2>/dev/null
   APPS="$RX3_USERHOME/.local/share/applications"
   DESK=$(xdg-user-dir DESKTOP 2>/dev/null); [ "$DESK" = "$RX3_USERHOME" ] && DESK=""
   for d in Escritorio Desktop; do [ -z "$DESK" ] && [ -d "$RX3_USERHOME/$d" ] && DESK="$RX3_USERHOME/$d"; done
@@ -297,7 +300,7 @@ RULE
 [Desktop Entry]
 Type=Application
 Name=XDJ-RX3
-Comment=Close the desktop and run the XDJ-RX3 player. Hold ESC for 1 second to come back.
+Comment=Close the desktop and run the XDJ-RX3 player. Hold CLOSE (or ESC) for 1 second to come back.
 Exec=systemctl start --no-block rx3-desktop.service
 Icon=multimedia-audio-player
 Terminal=false
@@ -307,7 +310,7 @@ DESKTOP
   done
   ok "icon in $APPS${DESK:+ and $DESK}"
   echo
-  echo "Done. Click the XDJ-RX3 icon to start the player; hold ESC for 1 second to stop it and get the desktop back."
+  echo "Done. Click the XDJ-RX3 icon to start the player; hold CLOSE on the strip (or ESC) for 1 second to get the desktop back."
   echo "Logs:  $RX3_LOGDIR/rx3-player.log   journalctl -u rx3 -u rx3-desktop -f"
   exit 0
 fi

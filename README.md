@@ -22,7 +22,8 @@ matched against a short profile list (`displays.py list`); rotation, chrome size
 line each in `rx3.conf`. A USB mouse works as a pointer when there is no touch panel.
 
 **The on-screen strip.** Two rows of ten buttons, in pages: SOURCE, BROWSE, SHORTCUT, SEARCH, UTILITY,
-BACK, UP/DOWN, ENTER, X-FADER (crossfader on/off), and per deck LOAD, USB STOP, PLAY/PAUSE and a DECK
+BACK, UP/DOWN, ENTER, X-FADER (crossfader on/off), CLOSE (held 1 s: stop the player and, when it was started
+from the XDJ-RX3 icon, return to the desktop), and per deck LOAD, USB STOP, PLAY/PAUSE and a DECK
 button that opens that deck's page (MASTER TEMPO, QUANTIZE, BACK). Buttons that are toggles light up from
 the firmware's own state: PLAY, MASTER TEMPO, QUANTIZE, HP CUE, X-FADER. Two slider bars carry the channel
 faders, master and headphone levels and crossfader for use without a controller.
