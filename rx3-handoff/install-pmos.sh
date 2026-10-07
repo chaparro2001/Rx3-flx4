@@ -2,7 +2,7 @@
 # One-shot install on postmarketOS (Alpine), e.g. a Lenovo IdeaPad Duet. Run as your normal user, from anywhere:
 #   sh install-pmos.sh
 # It does what INSTALL.md does by hand on a Pi, with the Alpine differences filled in:
-#   packages (apk), sudo for the wheel group (the scripts use sudo; pmOS ships doas), the ARM32 shim compiler
+#   packages (apk), sudo for the wheel group (the scripts use sudo; pmOS may ship only doas), the ARM32 shim compiler
 #   (Alpine has no glibc arm-linux-gnueabi-gcc, so a clang wrapper with Alpine's armv7 headers stands in),
 #   the firmware recovery, the chroot, ./install.sh, and the service. Re-running it skips what is already done.
 # Needs the systemd edition of postmarketOS: the player's helpers run as transient systemd units.
@@ -33,7 +33,7 @@ fi
 ls /dev/fb[0-9]* >/dev/null 2>&1 && echo "  ok   framebuffer $(ls /dev/fb[0-9]* | tr '\n' ' ')" || echo "  warn no /dev/fb* - nothing can be shown"
 
 say "packages"
-$AS_ROOT apk add bash coreutils util-linux sudo findutils kmod \
+$AS_ROOT apk add bash coreutils util-linux findutils kmod \
   python3 py3-pillow py3-cryptography fuse3 fuse-overlayfs exfatprogs alsa-utils rsync unzip libarchive-tools \
   build-base freetype-dev pkgconf font-dejavu clang lld
 # Names that changed between Alpine releases: the first one that exists wins. pgrep -a needs procps, not busybox.
@@ -43,14 +43,18 @@ for alts in procps-ng:procps 7zip:p7zip libgpiod; do
 done
 $AS_ROOT modprobe fuse 2>/dev/null || true
 
-say "sudo for the wheel group"
-# The player scripts call sudo (pmOS uses doas). Allow wheel, which the pmOS user is in, to use it too.
-id -nG | tr ' ' '\n' | grep -qx wheel || die "$(id -un) is not in the wheel group"
-if ! $AS_ROOT test -f /etc/sudoers.d/rx3-wheel; then
-  echo '%wheel ALL=(ALL:ALL) ALL' > /tmp/rx3-wheel.$$
-  $AS_ROOT install -m 440 -o root -g root /tmp/rx3-wheel.$$ /etc/sudoers.d/rx3-wheel; rm -f /tmp/rx3-wheel.$$
-  $AS_ROOT grep -qE '^[@#]includedir /etc/sudoers.d' /etc/sudoers || echo '@includedir /etc/sudoers.d' | $AS_ROOT tee -a /etc/sudoers >/dev/null
-  $AS_ROOT visudo -c >/dev/null || { $AS_ROOT rm -f /etc/sudoers.d/rx3-wheel; die "sudoers check failed"; }
+say "sudo"
+# The player scripts call sudo. Newer postmarketOS already has one (sudo-rs, or sudo) and installing the other conflicts,
+# so a working sudo is used as it is. Only a doas-only system gets sudo-rs, allowed for wheel (the pmOS user is in it).
+if ! command -v sudo >/dev/null 2>&1; then
+  id -nG | tr ' ' '\n' | grep -qx wheel || die "$(id -un) is not in the wheel group"
+  doas apk add sudo-rs || doas apk add sudo || die "could not install sudo"
+  if ! doas test -f /etc/sudoers.d/rx3-wheel; then
+    echo '%wheel ALL=(ALL:ALL) ALL' > /tmp/rx3-wheel.$$
+    doas install -m 440 -o root -g root /tmp/rx3-wheel.$$ /etc/sudoers.d/rx3-wheel; rm -f /tmp/rx3-wheel.$$
+    doas grep -qE '^[@#]includedir /etc/sudoers.d' /etc/sudoers || echo '@includedir /etc/sudoers.d' | doas tee -a /etc/sudoers >/dev/null
+    doas visudo -c >/dev/null || { doas rm -f /etc/sudoers.d/rx3-wheel; die "sudoers check failed"; }
+  fi
 fi
 AS_ROOT=sudo
 sudo -v || die "sudo does not accept your password"
