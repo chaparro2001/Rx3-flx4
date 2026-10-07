@@ -11,6 +11,7 @@ for p in usb1 usb2; do
   mountpoint -q $RX3_USB/$p/lower && umount -l $RX3_USB/$p/lower
 done
 rm -f $R/dev/sd??; $RX3_HOME/rx3-mtab.sh
+echo 1 > /sys/class/graphics/fbcon/cursor_blink 2>/dev/null; printf '\033[?25h' > /dev/tty1 2>/dev/null   # rx3-start.sh hid it
 for m in $R/tmp $R/dev/shm $R/dev/snd $R/dev/printkdrv0 $R/dev/null $R/dev/zero $R/dev/urandom $R/dev/random $R/dev/full; do
   mountpoint -q $m && umount -l $m
 done

@@ -21,3 +21,6 @@ host/bin/
 .DS_Store
 # per-machine settings
 rx3-handoff/rx3.conf
+
+# Start-up picture (rx3-splash.py): your own image stays local, it is often someone's trademark
+rx3-handoff/splash.*

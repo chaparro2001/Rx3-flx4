@@ -7,6 +7,12 @@ R=$RX3_ROOT; H=$RX3_HOME; U=$RX3_USER
 LOG=$RX3_LOGDIR/rx3-player.log
 if pgrep -x rbp-pi >/dev/null; then echo "RX3 player already running"; exit 0; fi
 
+# --- start-up picture (rx3-splash.py) until the presenter draws over it; no blinking console cursor on top --------
+if [ -n "$RX3_FB" ] && [ -e "$RX3_FB" ] && ! pgrep -x rx3-fb-present >/dev/null; then
+  echo 0 > /sys/class/graphics/fbcon/cursor_blink 2>/dev/null; printf '\033[?25l' > /dev/tty1 2>/dev/null
+  python3 $H/rx3-splash.py "$RX3_FB" || echo "start-up picture failed (the player starts anyway)"
+fi
+
 # --- host preparation ---------------------------------------------------------
 $H/mount-rx3.sh >/dev/null
 # Root helper that performs the firmware's own USB STOP unmounts (see rx3-priv.sh); its FIFO must exist before launch.
