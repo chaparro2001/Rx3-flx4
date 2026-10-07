@@ -28,7 +28,10 @@ if [ -n "$touch" ]; then mode=""; dev=$touch; elif [ -n "$mouse" ]; then mode="-
 cur=$(pgrep -a -f "^$B" | head -1)
 case "$cur" in *"$dev"*) exit 0;; esac          # already bridging this device
 systemctl stop rx3-pointer.service 2>/dev/null; pkill -f "^$B"; sleep 0.3
-systemd-run --quiet --unit=rx3-pointer --collect -p User=$RX3_USER -p StandardError=append:$RX3_USERHOME/rx3-touch.log \
+# The event devices are root:input. A desktop login also gets an ACL on them, but it goes with the session, and the
+# XDJ-RX3 icon ends the session before the player starts (rx3-session.sh): the input group is what is left.
+GRP=""; getent group input >/dev/null && GRP="-p SupplementaryGroups=input"
+systemd-run --quiet --unit=rx3-pointer --collect -p User=$RX3_USER $GRP -p StandardError=append:$RX3_USERHOME/rx3-touch.log \
   -E RX3_FB="$RX3_FB" -E RX3_ROTATE="$RX3_ROTATE" -E RX3_UI="$RX3_UI" -E RX3_UI_SCALE="$RX3_UI_SCALE" -E RX3_TOUCH="$RX3_TOUCH" \
   $B $mode $dev $R/dev/tsc2007_2-0048
 logger -t rx3 "pointer bridge started: $mode $dev"
