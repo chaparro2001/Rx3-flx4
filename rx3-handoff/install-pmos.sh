@@ -34,12 +34,28 @@ fi
 ls /dev/fb[0-9]* >/dev/null 2>&1 && echo "  ok   framebuffer $(ls /dev/fb[0-9]* | tr '\n' ' ')" || echo "  warn no /dev/fb* - nothing can be shown"
 
 say "packages"
-$AS_ROOT apk add bash coreutils util-linux findutils kmod \
+# Only what is missing goes to apk, so a re-run does not need the package database at all. When it does, the desktop's
+# software centre may be holding it ("Unable to lock database"): wait for it instead of failing.
+apk_add(){
+  for try in $(seq 1 30); do
+    out=$($AS_ROOT apk add "$@" 2>&1) && { echo "$out" | tail -1; return 0; }
+    echo "$out" | grep -q "lock database" || { echo "$out" >&2; return 1; }
+    [ $try = 1 ] && echo "  another program is using apk (software centre / updates?), waiting for it..."
+    sleep 10
+  done
+  echo "$out" >&2; return 1
+}
+have_pkg(){ apk info -e "$1" >/dev/null 2>&1; }
+NEED=""
+for p in bash coreutils util-linux findutils kmod \
   python3 py3-pillow py3-cryptography fuse3 fuse-overlayfs exfatprogs alsa-utils rsync unzip libarchive-tools \
-  build-base linux-headers freetype-dev pkgconf font-dejavu clang lld
+  build-base linux-headers freetype-dev pkgconf font-dejavu clang lld; do have_pkg $p || NEED="$NEED $p"; done
+$AS_ROOT true || die "need your password for $AS_ROOT"   # ask now: apk_add captures output, which would hide the prompt
+if [ -n "$NEED" ]; then apk_add $NEED || die "could not install:$NEED"; else echo "  all installed"; fi
 # Names that changed between Alpine releases: the first one that exists wins. pgrep -a needs procps, not busybox.
 for alts in procps-ng:procps 7zip:p7zip libgpiod polkit xdg-user-dirs; do
-  done_=""; for p in $(echo $alts | tr : ' '); do $AS_ROOT apk add "$p" >/dev/null 2>&1 && { done_=$p; break; }; done
+  done_=""; for p in $(echo $alts | tr : ' '); do have_pkg $p && { done_=$p; break; }; done
+  [ -z "$done_" ] && for p in $(echo $alts | tr : ' '); do apk_add "$p" >/dev/null 2>&1 && { done_=$p; break; }; done
   echo "  ${done_:-(none of $alts available, skipped)}"
 done
 $AS_ROOT modprobe fuse 2>/dev/null || true
