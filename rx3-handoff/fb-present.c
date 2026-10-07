@@ -78,6 +78,16 @@ static void draw_info(const struct ui*u,const char*l1,const char*l2,int up){uint
  label(x+w/2,y+h*2/5,l1,fitsize(l1,room,PX(26)),up?0xffffff:0x8a98a4);label(x+w/2,y+h*3/4,l2,fitsize(l2,room,PX(18)),0xa9b6c1);
  frame=live;}
 static long ms(void){struct timespec t;clock_gettime(CLOCK_MONOTONIC,&t);return t.tv_sec*1000+t.tv_nsec/1000000;}
+/* Side-band gestures (touch-bridge.c): dim hints drawn into the chrome, and a short flash naming what a gesture did. */
+static void draw_band_hints(const struct ui*u){
+ for(int side=0;side<2;side++){int x,w;gesture_band_box(u,side,&x,&w);
+  const char*l[]={"DRAG","BROWSE","","TAP","ENTER","",side?"BACK >>":"<< BACK",side?"<< LOAD 2":"LOAD 1 >>","","HOLD",side?"DECK 2":"DECK 1"};
+  int n=sizeof l/sizeof*l,room=w-PX(16);
+  for(int k=0;k<n;k++)if(*l[k])label(x+w/2,u->sy*(2*k+3)/(2*n+4),l[k],fitsize(l[k],room,PX(20)),0x4f6070);}}
+static void draw_band_flash(const struct ui*u,unsigned g){
+ int side=(g>>8)&1,a=g&255,x,w;gesture_band_box(u,side,&x,&w);char t[16];
+ snprintf(t,sizeof t,"%s",a==G_ENTER?"ENTER":a==G_BACK?"BACK":a==G_LOAD?(side?"LOAD 2":"LOAD 1"):a==G_DECK?(side?"DECK 2":"DECK 1"):"");
+ box(x+PX(6),PX(6),w-PX(12),u->sy-PX(12),0x1d4b6e);label(x+w/2,u->sy/2,t,fitsize(t,w-PX(16),PX(30)),0xffffff);}
 /* Slider i from its 160x333 design box (slider_box gives the origin and scale; the touch bridge inverts the same numbers). */
 static void drawslider(const struct ui*u,int i,const struct ui_state*st,int fresh){
  int x,y;double s;slider_box(u,i,&x,&y,&s);
@@ -103,6 +113,7 @@ static void relayout(int mode){
  filter=u.cw<SRC_W;
  box(0,0,UW,UH,0x101820);
  if(u.bw)for(int i=0;i<6;i++){int x,y;double sc;slider_box(&u,i,&x,&y,&sc);label(x+(int)(80*sc),y+(int)(27*sc),slider_names[i],(int)(23*sc+.5),0xffffff);}
+ if(gesture_band(&u,0,0)==0)draw_band_hints(&u);   /* bars hidden: the bands take gestures */
  memcpy(chrome,frame,sizeof(uint32_t)*UW*UH);
  fprintf(stderr,"presenter: %s %dx%d, rotate %d, ui %dx%d mode %s scale %.2f, picture %dx%d at %d,%d%s, strip %d px, bars %d px\n",
   fbname,u.W,u.H,u.rot,UW,UH,ui_mode_name(u.mode),S,u.cw,u.ch,u.cx,u.cy,filter?" (2x2 filtered)":"",u.sh,u.bw);}
@@ -144,7 +155,7 @@ int main(int argc,char**argv){
   for(int i=0;fonts[i];i++) fprintf(stderr,"  %s\n",fonts[i]);
   return 1;
  }
- int shown=-1;long net_at=0;char net1[64]="",net2[96]="";
+ int shown=-1;long net_at=0,flash_until=0;unsigned flash_seen=state->gesture_seq;char net1[64]="",net2[96]="";
  for(;;){
  int mode=ui_mode_now(base_mode,state);if(mode!=laid){relayout(mode);shown=-1;}   /* at start, and on SETTINGS > BARS */
  int pg=state->page>=0&&state->page<NPAGES?state->page:0;
@@ -164,6 +175,8 @@ int main(int argc,char**argv){
   for(int y=0;y<22;y++)for(int x=0;x<=y&&x<16;x++){int px=cx+x,py=cy+y;if(px<0||px>=UW||py<0||py>=UH)continue;
    int edge=(x==0||x==y||y==21||x==15);frame[py*UW+px]=edge?0x000000:0xffffff;}}
  if(u.bw)for(int i=0;i<6;i++)drawslider(&u,i,state,fresh);
+ if(state->gesture_seq!=flash_seen){flash_seen=state->gesture_seq;flash_until=ms()+450;}
+ if(ms()<flash_until&&gesture_band(&u,0,0)==0)draw_band_flash(&u,state->gesture);
  for(int py=0;py<H;py++){const int *m=idx+py*W;unsigned char *line=d+py*f.line_length;
   if(bpp16){uint16_t*row16=(uint16_t*)line;for(int px=0;px<W;px++){uint32_t c=frame[m[px]];row16[px]=(uint16_t)(((c>>8)&0xf800)|((c>>5)&0x07e0)|((c>>3)&0x001f));}}
   else{uint32_t*row32=(uint32_t*)line;for(int px=0;px<W;px++)row32[px]=frame[m[px]];}}

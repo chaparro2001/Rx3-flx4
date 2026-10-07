@@ -18,7 +18,8 @@ struct command {int key,operation,channel,value;float analog;int extra;};
 struct ui_state {unsigned magic;float level[6];unsigned pressed;unsigned headphone_cue;int cursor_x,cursor_y,cursor_visible;int page;
  unsigned deck[2];unsigned state_seq;unsigned hotcue[2];   /* hotcue[n]: bit k = hot cue A+k of the track on player n is set */
  unsigned chlevel[2];                                       /* chlevel[n]: the engine's own reading of mixer input n (getInputChLevelMono) */
- unsigned ui_flags;};                                       /* UI_* below: set by the touch bridge, followed by the presenter */
+ unsigned ui_flags;                                         /* UI_* below: set by the touch bridge, followed by the presenter */
+ unsigned gesture,gesture_seq;};                            /* last side-band gesture (side<<8 | G_*), bumped per gesture */
 #define UI_BARS_HIDDEN 1     /* SETTINGS > BARS: the slider bars are hidden (remembered in ~/.rx3-ui by the touch bridge) */
 #define DECK_PLAYING 1
 #define DECK_MASTER_TEMPO 2
@@ -182,6 +183,14 @@ static inline struct ui ui_from_env(int W,int H){
  const char*s=getenv("RX3_UI_SCALE");double scale=s&&*s?atof(s):0;
  return make_ui(W,H,rotation_for(W,H),scale,mode);}
 static inline const char *ui_mode_name(int mode){return mode==UI_STRIP?"strip":mode==UI_NONE?"none":"full";}
+/* Gesture bands: with no slider bars, the strips beside the picture (above the button strip) take one-finger gestures,
+   which the firmware never sees (touch-bridge.c); the presenter draws hints there and flashes what was done.
+   0 = left band (deck 1), 1 = right band (deck 2), -1 = anywhere else. Bands narrower than 40 px are not used. */
+static inline int gesture_band(const struct ui*u,int x,int y){
+ if(u->bw||y>=u->sy||u->cx<40)return -1;
+ return x<u->cx?0:x>=u->cx+u->cw?1:-1;}
+static inline void gesture_band_box(const struct ui*u,int side,int*x,int*w){*x=side?u->cx+u->cw:0;*w=side?u->uw-*x:u->cx;}
+enum {G_NONE,G_ENTER,G_BACK,G_LOAD,G_DECK};
 /* The mode in force: RX3_UI's, minus the bars while SETTINGS > BARS hides them. */
 static inline int ui_mode_now(int base,const struct ui_state*st){return base==UI_FULL&&(st->ui_flags&UI_BARS_HIDDEN)?UI_STRIP:base;}
 /* RX3_FB names the framebuffer to draw on (rx3-env.sh picks the DSI panel when one exists). */
