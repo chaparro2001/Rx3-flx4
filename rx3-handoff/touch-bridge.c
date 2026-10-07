@@ -54,8 +54,9 @@ static void switch_page(struct finger*fingers,int to){
  for(int i=0;i<10;i++)if(fingers[i].active&&fingers[i].region>0&&fingers[i].region<=NBUTTONS){button(fingers[i].region-1,0);fingers[i].region=-1;}
  state->pressed=0;state->page=to;fprintf(stderr,"strip page %d\n",to);}
 /* Side-band gestures (gesture_band() in pi-controls.h): one finger, never passed to the firmware. Both bands: drag
-   up/down = browse (one step per G_STEP px), tap = ENTER, swipe outward = BACK. Per side, left = deck 1 and right = deck 2:
-   swipe inward (towards the picture) = LOAD that deck, hold 1 s = that deck's page. A swipe may end over the picture. */
+   up/down = browse (one step per G_STEP px), tap = ENTER, swipe left = BACK. Per side, left = deck 1 and right = deck 2:
+   swipe right = LOAD that deck, hold 1 s = that deck's page. Directions are the same in both bands (the user's choice
+   over mirrored ones). A swipe may end over the picture. */
 #define G_STEP 40
 #define G_SWIPE 70
 static void flash(int side,int action){state->gesture=(unsigned)side<<8|action;state->gesture_seq++;}
@@ -67,7 +68,7 @@ static void gesture_move(struct finger*fingers,struct finger*f,int lx,int ly,lon
 static void gesture_end(struct finger*f,int lx,int ly,long now){
  int side=f->region-REGION_GESTURE,dx=lx-f->gx0,dy=ly-f->gy0;if(f->held||f->scrolled)return;
  if(abs(dx)>=G_SWIPE&&abs(dx)>abs(dy)&&now-f->gt0<=600){
-  if(side?dx<0:dx>0){key_tap(0x4311,side+1);flash(side,G_LOAD);}else{key_tap(0x420d,0);flash(side,G_BACK);}}
+  if(dx>0){key_tap(0x4311,side+1);flash(side,G_LOAD);}else{key_tap(0x420d,0);flash(side,G_BACK);}}
  else if(!f->moved&&now-f->gt0<400){key_tap(0x420c,0);flash(side,G_ENTER);}}
 /* RX3_TOUCH: "swap", "invx", "invy" (comma-separated) for touch controllers whose axes do not follow the panel's.
    swap is applied first, on the controller's axes; the inversions then act on panel pixels. */

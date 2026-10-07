@@ -81,7 +81,7 @@ static long ms(void){struct timespec t;clock_gettime(CLOCK_MONOTONIC,&t);return 
 /* Side-band gestures (touch-bridge.c): dim hints drawn into the chrome, and a short flash naming what a gesture did. */
 static void draw_band_hints(const struct ui*u){
  for(int side=0;side<2;side++){int x,w;gesture_band_box(u,side,&x,&w);
-  const char*l[]={"DRAG","BROWSE","","TAP","ENTER","",side?"BACK >>":"<< BACK",side?"<< LOAD 2":"LOAD 1 >>","","HOLD",side?"DECK 2":"DECK 1"};
+  const char*l[]={"DRAG","BROWSE","","TAP","ENTER","","<< BACK",side?"LOAD 2 >>":"LOAD 1 >>","","HOLD",side?"DECK 2":"DECK 1"};
   int n=sizeof l/sizeof*l,room=w-PX(16);
   for(int k=0;k<n;k++)if(*l[k])label(x+w/2,u->sy*(2*k+3)/(2*n+4),l[k],fitsize(l[k],room,PX(20)),0x4f6070);}}
 static void draw_band_flash(const struct ui*u,unsigned g){

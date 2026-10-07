@@ -30,8 +30,8 @@ return to the desktop) and BACK. Buttons that are toggles light up from
 the firmware's own state: PLAY, MASTER TEMPO, QUANTIZE, HP CUE, X-FADER. Two slider bars carry the channel
 faders, master and headphone levels and crossfader for use without a controller.
 With the bars hidden, the two bands beside the picture take one-finger gestures the firmware never sees: drag up/down
-to browse, tap for ENTER, swipe outward for BACK, swipe inward to LOAD that side's deck (left = 1, right = 2), hold 1 s
-for that deck's page.
+to browse, tap for ENTER, swipe left for BACK, swipe right to LOAD that side's deck (left band = 1, right band = 2),
+hold 1 s for that deck's page.
 
 **The controller (DDJ-FLX4 / DDJ-400).** Transport, cues, loops, beat jump, pads, sync, tempo, jog with
 scratch, the mixer (faders, EQ, trim, colour FX, master and headphone levels, headphone cue), Beat FX, browse
