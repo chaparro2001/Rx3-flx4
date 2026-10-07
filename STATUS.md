@@ -1,4 +1,4 @@
-# Status — 2026-09-17
+# Status — 2026-10-07
 
 ## Working and verified on hardware
 
@@ -48,6 +48,15 @@
 **Host**
 - Wi-Fi and Ethernet, SSH key login, controller re-enumeration after power glitches.
 
+**postmarketOS on a Lenovo IdeaPad Duet** (systemd edition; verified 2026-10-07)
+- `install-pmos.sh` installs everything in one run: Alpine packages, the shim built with clang + Alpine's armv7
+  headers, firmware recovery, the chroot (the Duet's kernel runs the 32-bit firmware), the service and the polkit rule.
+- The desktop stays the default: the **XDJ-RX3** icon closes it and starts the player; CLOSE brings it back.
+- Picture and touch right with the `duet` display profile (1200x1920 panel, rotate 270). Touch needed the touch bridge
+  to run with the `input` group, since the desktop session's device access ends when the icon closes the session.
+- SETTINGS page: BARS hides and shows the slider bars and is remembered across starts; the IP address is shown;
+  CLOSE (held 1 s) returns to the desktop.
+
 ## Work in progress
 
 - **Unlit FLX4 buttons**: SLIP and BEAT FX ON/OFF do not reflect state yet; their getters still need finding. Same path
@@ -56,5 +65,7 @@
 - **Device names**: SOURCE shows USB1/USB2 rather than each stick's volume label.
 - **No auto-restart**: if the player process crashes the service does not restart it; `systemctl restart rx3` is needed.
 - **Power**: the Pi still reports under-voltage with the FLX4 attached on a stock supply. An official 27 W supply or a powered hub is recommended.
-- **Untested by a person**: touch panel input, recording, MIC input, AUX, link/export features, and long-session stability.
+- **Duet, not yet tried**: the FLX4 (audio and control) and USB sticks, through a USB-C hub; a network folder as USB2
+  is proposed (SMB/NFS share as the overlay's lower layer) but not started.
+- **Untested by a person**: recording, MIC input, AUX, link/export features, and long-session stability.
 - **Deployment**: `DEPLOY.md` is a manual recipe rather than a one-shot installer.
