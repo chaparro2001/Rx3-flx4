@@ -262,6 +262,8 @@ done
 } > "$tmp/98-rx3-controller.rules"
 sudo rm -f /etc/udev/rules.d/98-rx3-flx4.rules
 sed "s|@RX3_HOME@|$RX3_HOME|g" "$RX3_HOME/rx3.service.in" > "$tmp/rx3.service"
+# postmarketOS ships without these directories (Debian has them); install -m into a missing one fails.
+sudo mkdir -p /etc/udev/rules.d /etc/systemd/system
 sudo install -m 644 "$tmp"/*.rules /etc/udev/rules.d/ || exit 1
 sudo install -m 644 "$tmp/rx3.service" /etc/systemd/system/ || exit 1
 sudo udevadm control --reload
