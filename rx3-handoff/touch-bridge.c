@@ -25,12 +25,22 @@ static void command(int key,int op,int ch,int value,float a){struct command c={k
    right after the press so a tap is enough, and never on its own (see the USB STOP note above). */
 /* CLOSE stops the player once it has been held for a second, so a stray touch cannot end a set. Released early, nothing. */
 static long close_since;
+/* BARS: show or hide the slider bars. The choice lives in ui_state for the presenter and in ~/.rx3-ui for next time;
+   the layout is rebuilt here from the same make_ui() the presenter uses, so touches keep matching the picture. */
+static int base_mode;static char prefs[512];
+static void apply_bars(int hidden){if(hidden)state->ui_flags|=UI_BARS_HIDDEN;else state->ui_flags&=~UI_BARS_HIDDEN;
+ u=make_ui(u.W,u.H,u.rot,u.scale,ui_mode_now(base_mode,state));}
+static int load_bars(void){FILE*f=*prefs?fopen(prefs,"r"):0;if(!f)return 0;char l[64]={0};int h=fgets(l,sizeof l,f)&&!strncmp(l,"bars=hidden",11);fclose(f);return h;}
+static void save_bars(void){FILE*f=*prefs?fopen(prefs,"w"):0;if(!f){if(*prefs)perror(prefs);return;}
+ fprintf(f,"bars=%s\n",state->ui_flags&UI_BARS_HIDDEN?"hidden":"shown");fclose(f);}
 static void button(int i,int down){
  const struct button*b=&page_of(state->page)->buttons[i];if(!b->label||b->page>=0)return;
  if(down)state->pressed|=1u<<i;else state->pressed&=~(1u<<i);
  if(b->key==CMD_CLOSE){if(down)close_since=millis();
   else if(close_since&&millis()-close_since>=1000){fprintf(stderr,"CLOSE: stopping the player\n");if(system("systemctl stop --no-block rx3.service"))perror("CLOSE");}
   if(!down)close_since=0;return;}
+ if(b->key==CMD_BARS){if(down){apply_bars(!(state->ui_flags&UI_BARS_HIDDEN));save_bars();
+  fprintf(stderr,"BARS: %s, strip %d px, bars %d px\n",state->ui_flags&UI_BARS_HIDDEN?"hidden":"shown",u.sh,u.bw);}return;}
  if(b->scroll){if(down)command(b->key,4,0,b->scroll,0);return;}
  command(b->key,down?0:2,b->channel,0,0);
  if(down&&b->hold)command(b->key,1,b->channel,0,0);
@@ -60,6 +70,8 @@ int main(int argc,char**argv){
  /* Same panel geometry, rotation and chrome as the presenter, so a touch lands exactly under what is drawn there. */
  int W=1920,H=1200;{int fb=open(fb_device(),O_RDONLY);if(fb>=0){struct fb_var_screeninfo v;if(!ioctl(fb,FBIOGET_VSCREENINFO,&v)){W=v.xres;H=v.yres;}close(fb);}}
  u=ui_from_env(W,H);touch_flags();
+ base_mode=u.mode;{const char*home=getenv("HOME");if(home&&*home)snprintf(prefs,sizeof prefs,"%s/.rx3-ui",home);}
+ apply_bars(load_bars());
  int direct=mouse||replay;   /* mouse: UI pixels; replay: the firmware's own 1280x800 coordinates */
  /* Multitouch (type B) controllers report ABS_MT_*; single-touch ones (resistive, some USB HID panels) only ABS_X/ABS_Y
     with BTN_TOUCH. Both are handled; the second kind is finger 0. */

@@ -17,7 +17,9 @@ struct command {int key,operation,channel,value;float analog;int extra;};
    control-shim.c cannot include this header (-nostdlib build), so it writes the last seven words at byte 52. */
 struct ui_state {unsigned magic;float level[6];unsigned pressed;unsigned headphone_cue;int cursor_x,cursor_y,cursor_visible;int page;
  unsigned deck[2];unsigned state_seq;unsigned hotcue[2];   /* hotcue[n]: bit k = hot cue A+k of the track on player n is set */
- unsigned chlevel[2];};                                     /* chlevel[n]: the engine's own reading of mixer input n (getInputChLevelMono) */
+ unsigned chlevel[2];                                       /* chlevel[n]: the engine's own reading of mixer input n (getInputChLevelMono) */
+ unsigned ui_flags;};                                       /* UI_* below: set by the touch bridge, followed by the presenter */
+#define UI_BARS_HIDDEN 1     /* SETTINGS > BARS: the slider bars are hidden (remembered in ~/.rx3-ui by the touch bridge) */
 #define DECK_PLAYING 1
 #define DECK_MASTER_TEMPO 2
 #define DECK_QUANTIZE 4
@@ -31,11 +33,12 @@ struct ui_state {unsigned magic;float level[6];unsigned pressed;unsigned headpho
 #define CMD_XFADER 0xFFFE    /* press toggles the crossfader assignment */
 #define CMD_CLOSE 0xFFFD     /* held 1 s: stop the player. Handled by touch-bridge.c itself (systemctl), never sent to the shim;
                                 started from the XDJ-RX3 icon, rx3-session.sh then brings the desktop back */
+#define CMD_BARS 0xFFFC      /* press shows/hides the slider bars (UI_BARS_HIDDEN). Also handled by touch-bridge.c only */
 #define UI_STATE_DECK_OFFSET 52
 _Static_assert(offsetof(struct ui_state,deck)==UI_STATE_DECK_OFFSET&&offsetof(struct ui_state,hotcue)==UI_STATE_DECK_OFFSET+12&&offsetof(struct ui_state,chlevel)==UI_STATE_DECK_OFFSET+20,"control-shim.c writes deck[2], state_seq, hotcue[2], chlevel[2] from this offset");
 /* The button strip: BUTTON_ROWS rows of BUTTON_COLS cells under the content area, showing one *page* of buttons at a
    time. The main page has navigation on row 1 and the decks on row 2; DECK 1 / DECK 2 switch to a page with that deck's
-   toggles and a BACK that returns to the main page. A page button sends nothing to the firmware. An entry with no label
+   toggles and a BACK that returns to the main page; SETTINGS likewise, with BARS and CLOSE. A page button sends nothing to the firmware. An entry with no label
    is an empty cell (drawn as background, touches ignored), as are cells past the page's count.
    `scroll` makes the button a repeating rotary step (the browse selector); `hold` adds the firmware's operation 1
    ("long-pressed") right after the press - UTILITY is the panel's MENU key (0x206) held down. QUANTIZE and MASTER
@@ -47,7 +50,7 @@ _Static_assert(offsetof(struct ui_state,deck)==UI_STATE_DECK_OFFSET&&offsetof(st
    `page` >= 0 makes the button switch the strip to that page instead of sending `key`.
    `light` is a DECK_* bit: the button is drawn lit while the engine reports it set for `channel`. */
 struct button {const char *label,*brief;int key,channel,scroll,hold,page,light;unsigned color;};
-enum {PAGE_MAIN,PAGE_DECK1,PAGE_DECK2,NPAGES};
+enum {PAGE_MAIN,PAGE_DECK1,PAGE_DECK2,PAGE_SETTINGS,NPAGES};
 #define C_NAV 0x08699c
 #define C_SET 0x4b3a6d
 #define C_KEY 0x283542
@@ -63,7 +66,7 @@ static const struct button main_buttons[]={
  {"UTILITY",0,0x206,0,0,1,-1,0,C_SET},KEY("BACK",0,0x420d,0,C_KEY),{"UP",0,0x420c,0,-1,0,-1,0,C_KEY},{"DOWN",0,0x420c,0,1,0,-1,0,C_KEY},
  KEY("ENTER",0,0x420c,0,C_KEY),LIT("X-FADER","XF",CMD_XFADER,1,DECK_XFADER,C_SET),
  KEY("LOAD 1",0,0x4311,1,C_LOAD),KEY("USB STOP 1 (hold)","EJECT 1",0x8002,1,C_STOP),LIT("PLAY / PAUSE 1","PLAY 1",0x4101,1,DECK_PLAYING,C_PLAY),
- {"DECK 1",0,0,0,0,0,PAGE_DECK1,0,C_DECK},KEY("CLOSE (hold)","CLOSE",CMD_CLOSE,0,C_STOP),
+ {"DECK 1",0,0,0,0,0,PAGE_DECK1,0,C_DECK},{"SETTINGS",0,0,0,0,0,PAGE_SETTINGS,0,C_SET},
  KEY("LOAD 2",0,0x4311,2,C_LOAD),KEY("USB STOP 2 (hold)","EJECT 2",0x8002,2,C_STOP),LIT("PLAY / PAUSE 2","PLAY 2",0x4101,2,DECK_PLAYING,C_PLAY),
  {"DECK 2",0,0,0,0,0,PAGE_DECK2,0,C_DECK}
 };
@@ -75,9 +78,14 @@ static const struct button deck2_buttons[]={
  LIT("MASTER TEMPO 2","MT 2",0x4108,2,DECK_MASTER_TEMPO,C_DECK),LIT("QUANTIZE 2","Q 2",0x410b,2,DECK_QUANTIZE,C_DECK),EMPTY,EMPTY,EMPTY,EMPTY,EMPTY,EMPTY,EMPTY,
  {"BACK",0,0,0,0,0,PAGE_MAIN,0,C_KEY}
 };
+/* BARS is drawn lit while the bars are on screen (fb-present.c), not from a deck bit. */
+static const struct button settings_buttons[]={
+ KEY("BARS",0,CMD_BARS,0,C_SET),KEY("CLOSE (hold)","CLOSE",CMD_CLOSE,0,C_STOP),EMPTY,EMPTY,EMPTY,EMPTY,EMPTY,EMPTY,EMPTY,
+ {"BACK",0,0,0,0,0,PAGE_MAIN,0,C_KEY}
+};
 struct page {const struct button *buttons;int n;};
 #define PAGE(t) {t,(int)(sizeof(t)/sizeof*(t))}
-static const struct page pages[NPAGES]={PAGE(main_buttons),PAGE(deck1_buttons),PAGE(deck2_buttons)};
+static const struct page pages[NPAGES]={PAGE(main_buttons),PAGE(deck1_buttons),PAGE(deck2_buttons),PAGE(settings_buttons)};
 static const char *slider_names[6]={"DECK 1","MASTER","HP MIX","DECK 2","HP LEVEL","CROSS"};
 static const int slider_keys[6]={0x501e,0x4403,0x4405,0x501e,0x4406,0x6017};
 static const int slider_channels[6]={1,0,0,2,0,0};
@@ -151,6 +159,8 @@ static inline struct ui ui_from_env(int W,int H){
  const char*s=getenv("RX3_UI_SCALE");double scale=s&&*s?atof(s):0;
  return make_ui(W,H,rotation_for(W,H),scale,mode);}
 static inline const char *ui_mode_name(int mode){return mode==UI_STRIP?"strip":mode==UI_NONE?"none":"full";}
+/* The mode in force: RX3_UI's, minus the bars while SETTINGS > BARS hides them. */
+static inline int ui_mode_now(int base,const struct ui_state*st){return base==UI_FULL&&(st->ui_flags&UI_BARS_HIDDEN)?UI_STRIP:base;}
 /* RX3_FB names the framebuffer to draw on (rx3-env.sh picks the DSI panel when one exists). */
 static inline const char *fb_device(void){const char*e=getenv("RX3_FB");return e&&*e?e:"/dev/fb0";}
 #endif
