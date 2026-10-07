@@ -35,7 +35,7 @@ ls /dev/fb[0-9]* >/dev/null 2>&1 && echo "  ok   framebuffer $(ls /dev/fb[0-9]* 
 say "packages"
 $AS_ROOT apk add bash coreutils util-linux findutils kmod \
   python3 py3-pillow py3-cryptography fuse3 fuse-overlayfs exfatprogs alsa-utils rsync unzip libarchive-tools \
-  build-base freetype-dev pkgconf font-dejavu clang lld
+  build-base linux-headers freetype-dev pkgconf font-dejavu clang lld
 # Names that changed between Alpine releases: the first one that exists wins. pgrep -a needs procps, not busybox.
 for alts in procps-ng:procps 7zip:p7zip libgpiod; do
   done_=""; for p in $(echo $alts | tr : ' '); do $AS_ROOT apk add "$p" >/dev/null 2>&1 && { done_=$p; break; }; done
