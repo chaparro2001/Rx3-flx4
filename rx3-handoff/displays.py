@@ -29,9 +29,9 @@ DISPLAYS = [
     ('td2', dict(name='Raspberry Pi Touch Display 2 (7" DSI, 720x1280 portrait)',
                  fbname='dsi', size=(720, 1280), rotate='90', ui='full', ui_scale='', touch='')),
     # Lenovo IdeaPad Duet / Chromebook Duet under postmarketOS (install-pmos.sh): MT8183 DSI panel, 1200x1920 portrait.
-    # Not yet run on the device: if the picture is upside down with the keyboard attached, RX3_ROTATE=270 in rx3.conf.
+    # 270, not the Touch Display 2's 90: at 90 the picture came out upside down on the Duet (strip at the top).
     ('duet', dict(name='Lenovo Duet (10.1" DSI, 1200x1920 portrait)',
-                 fbname=None, size=(1200, 1920), rotate='90', ui='full', ui_scale='', touch='')),
+                 fbname=None, size=(1200, 1920), rotate='270', ui='full', ui_scale='', touch='')),
     ('hdmi1080', dict(name='HDMI 1920x1080, touch or not',
                  fbname=None, size=(1920, 1080), rotate='0', ui='full', ui_scale='', touch='')),
     ('hdmi', dict(name='HDMI, any other resolution',
