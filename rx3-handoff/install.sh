@@ -4,6 +4,7 @@
 #   ./install.sh deps     install the Debian packages this needs
 #   ./install.sh doctor   check prerequisites only, change nothing
 #   ./install.sh          full install (binaries, udev rules, systemd unit)
+#   RX3_KEEP_DESKTOP=1 ./install.sh   ... but keep the desktop: an "XDJ-RX3" icon swaps it for the player on demand
 #   ./install.sh desktop  stop the player and hand the Pi back to its desktop
 #   ./install.sh strays   remove only the stray "$RX3_..." directories an older script version left behind
 #   ./install.sh clean    remove everything a previous install left behind (keeps the recovered firmware)
@@ -145,6 +146,8 @@ if [ "${1:-}" = clean ]; then
   printf "Continue? [y/N] "; read -r a; [ "$a" = y ] || [ "$a" = Y ] || { echo "aborted"; exit 1; }
   sudo systemctl disable --now rx3 2>/dev/null
   sudo systemctl stop rx3-priv rx3-pointer 'rx3-overlay-*' 'rx3-hotkeys-*' 2>/dev/null
+  sudo systemctl stop rx3-desktop 2>/dev/null
+  sudo rm -f /etc/systemd/system/rx3-desktop.service /etc/polkit-1/rules.d/50-rx3.rules "$RX3_USERHOME/.local/share/applications/rx3.desktop"
   sudo rm -f /etc/systemd/system/rx3.service /etc/udev/rules.d/97-rx3-input.rules /etc/udev/rules.d/98-rx3-flx4.rules /etc/udev/rules.d/98-rx3-controller.rules /etc/udev/rules.d/99-rx3-usb.rules
   sudo systemctl daemon-reload; sudo udevadm control --reload
   for m in $(findmnt -rn -o TARGET | grep -E "^($RX3_ROOT|$RX3_USB)/" | sort -r); do sudo umount -l "$m" 2>/dev/null; done
@@ -262,13 +265,52 @@ done
 } > "$tmp/98-rx3-controller.rules"
 sudo rm -f /etc/udev/rules.d/98-rx3-flx4.rules
 sed "s|@RX3_HOME@|$RX3_HOME|g" "$RX3_HOME/rx3.service.in" > "$tmp/rx3.service"
+sed "s|@RX3_HOME@|$RX3_HOME|g" "$RX3_HOME/rx3-desktop.service.in" > "$tmp/rx3-desktop.service"
 # postmarketOS ships without these directories (Debian has them); install -m into a missing one fails.
 sudo mkdir -p /etc/udev/rules.d /etc/systemd/system
 sudo install -m 644 "$tmp"/*.rules /etc/udev/rules.d/ || exit 1
-sudo install -m 644 "$tmp/rx3.service" /etc/systemd/system/ || exit 1
+sudo install -m 644 "$tmp/rx3.service" "$tmp/rx3-desktop.service" /etc/systemd/system/ || exit 1
 sudo udevadm control --reload
 sudo systemctl daemon-reload
 ok "installed udev rules and rx3.service"
+
+if [ -n "${RX3_KEEP_DESKTOP:-}" ]; then
+  # Desktop stays the default. rx3-session.sh (unit rx3-desktop) closes it, frees the audio, runs the player and
+  # brings the desktop back when the player stops; the icon starts that unit, which polkit lets wheel/sudo do.
+  echo "== desktop icon: the player only runs when it is clicked"
+  sudo systemctl disable rx3 >/dev/null 2>&1
+  systemctl --user unmask pipewire pipewire-pulse wireplumber pipewire.socket pipewire-pulse.socket 2>/dev/null
+  sudo mkdir -p /etc/polkit-1/rules.d
+  sudo tee /etc/polkit-1/rules.d/50-rx3.rules >/dev/null <<'RULE'
+// XDJ-RX3 icon: members of wheel/sudo may start the player session without a password.
+polkit.addRule(function(action, subject) {
+  if (action.id == "org.freedesktop.systemd1.manage-units" && action.lookup("unit") == "rx3-desktop.service" &&
+      action.lookup("verb") == "start" && (subject.isInGroup("wheel") || subject.isInGroup("sudo")))
+    return polkit.Result.YES;
+});
+RULE
+  APPS="$RX3_USERHOME/.local/share/applications"
+  DESK=$(xdg-user-dir DESKTOP 2>/dev/null); [ "$DESK" = "$RX3_USERHOME" ] && DESK=""
+  for d in Escritorio Desktop; do [ -z "$DESK" ] && [ -d "$RX3_USERHOME/$d" ] && DESK="$RX3_USERHOME/$d"; done
+  for d in "$APPS" ${DESK:+"$DESK"}; do
+    mkdir -p "$d" && cat > "$d/rx3.desktop" <<DESKTOP
+[Desktop Entry]
+Type=Application
+Name=XDJ-RX3
+Comment=Close the desktop and run the XDJ-RX3 player. Hold ESC for 1 second to come back.
+Exec=systemctl start --no-block rx3-desktop.service
+Icon=multimedia-audio-player
+Terminal=false
+Categories=AudioVideo;Audio;
+DESKTOP
+    chmod 755 "$d/rx3.desktop"
+  done
+  ok "icon in $APPS${DESK:+ and $DESK}"
+  echo
+  echo "Done. Click the XDJ-RX3 icon to start the player; hold ESC for 1 second to stop it and get the desktop back."
+  echo "Logs:  $RX3_LOGDIR/rx3-player.log   journalctl -u rx3 -u rx3-desktop -f"
+  exit 0
+fi
 
 echo "== audio: keep PipeWire off the sound cards"
 systemctl --user mask --now pipewire pipewire-pulse wireplumber pipewire.socket pipewire-pulse.socket 2>/dev/null

@@ -13,6 +13,8 @@ particular username: the scripts work out where they live and which account owns
 > `git clone https://github.com/mutlisensor/Rx3-flx4.git && sh Rx3-flx4/rx3-handoff/install-pmos.sh`.
 > It needs the **systemd** edition of postmarketOS and a kernel that runs 32-bit ARM programs (it checks both).
 > Alpine has no `gcc-arm-linux-gnueabi`, so it builds the shim with clang and Alpine's armv7 headers instead.
+> The desktop stays the default: an **XDJ-RX3** icon closes it and runs the player, and holding ESC for 1 s on a
+> keyboard stops the player and brings the desktop back (`RX3_KEEP_DESKTOP=1 ./install.sh` does the same on a Pi).
 > Not yet verified on a device.
 
 ## 1. Get the files and the packages

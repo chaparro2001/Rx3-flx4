@@ -1,0 +1,9 @@
+[Unit]
+Description=XDJ-RX3 player in place of the desktop, until the player stops (started by the XDJ-RX3 icon)
+# It switches targets itself, so switching must not stop it; neither may rx3, started from here.
+IgnoreOnIsolate=yes
+
+[Service]
+Type=simple
+ExecStart=@RX3_HOME@/rx3-session.sh
+TimeoutStopSec=60

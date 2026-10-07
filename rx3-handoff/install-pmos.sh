@@ -4,7 +4,8 @@
 # It does what INSTALL.md does by hand on a Pi, with the Alpine differences filled in:
 #   packages (apk), sudo for the wheel group (the scripts use sudo; pmOS may ship only doas), the ARM32 shim compiler
 #   (Alpine has no glibc arm-linux-gnueabi-gcc, so a clang wrapper with Alpine's armv7 headers stands in),
-#   the firmware recovery, the chroot, ./install.sh, and the service. Re-running it skips what is already done.
+#   the firmware recovery, the chroot and ./install.sh. Re-running it skips what is already done.
+# The desktop stays: an "XDJ-RX3" icon swaps it for the player, and holding ESC for 1 s brings it back.
 # Needs the systemd edition of postmarketOS: the player's helpers run as transient systemd units.
 set -eu
 H=$(cd "$(dirname "$(readlink -f "$0")")" && pwd)
@@ -37,7 +38,7 @@ $AS_ROOT apk add bash coreutils util-linux findutils kmod \
   python3 py3-pillow py3-cryptography fuse3 fuse-overlayfs exfatprogs alsa-utils rsync unzip libarchive-tools \
   build-base linux-headers freetype-dev pkgconf font-dejavu clang lld
 # Names that changed between Alpine releases: the first one that exists wins. pgrep -a needs procps, not busybox.
-for alts in procps-ng:procps 7zip:p7zip libgpiod; do
+for alts in procps-ng:procps 7zip:p7zip libgpiod polkit xdg-user-dirs; do
   done_=""; for p in $(echo $alts | tr : ' '); do $AS_ROOT apk add "$p" >/dev/null 2>&1 && { done_=$p; break; }; done
   echo "  ${done_:-(none of $alts available, skipped)}"
 done
@@ -108,13 +109,13 @@ sudo chroot "$RX3_ROOT" /bin/busybox true 2>/dev/null \
 echo "  ok   the 32-bit firmware runs on this kernel"
 
 say "install"
-./install.sh
-sudo systemctl enable rx3
+RX3_KEEP_DESKTOP=1 ./install.sh
+# An earlier version of this script made the player start at boot instead of the desktop: undo that.
+sudo systemctl set-default graphical.target >/dev/null
 
 say "done"
-echo "The player starts at boot from now on, instead of the postmarketOS desktop."
-echo "  Reboot now:           sudo reboot"
-echo "  Logs:                 $H/rx3-logs.sh"
-echo "  Back to the desktop:  $H/install.sh desktop"
-echo "If the picture is upside down:  echo RX3_ROTATE=270 >> $H/rx3.conf   (then: sudo systemctl restart rx3)"
+echo "Tap the XDJ-RX3 icon (app list, and the desktop folder if there is one) to start the player."
+echo "The desktop closes while it runs. Hold ESC for 1 second on the keyboard to stop it and get the desktop back."
+echo "  Logs:  $H/rx3-logs.sh"
+echo "If the picture is upside down:  echo RX3_ROTATE=270 >> $H/rx3.conf"
 echo "The Duet has one USB-C port: connect the controller and the USB stick through a hub, ideally a powered one."
