@@ -8,6 +8,10 @@
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
+#include <ifaddrs.h>
+#include <net/if.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
 #include <ft2build.h>
 #include FT_FREETYPE_H
 #include "pi-controls.h"
@@ -50,6 +54,28 @@ static int state_fresh(const struct ui_state*st){static unsigned seen;static lon
 /* The strip is part of the static chrome; it is redrawn there only when the touch bridge switches page. */
 static void draw_strip(const struct ui*u,int p){uint32_t *live=frame;frame=chrome;
  box(u->sx,u->sy,u->sw,u->sh,0x101820);for(int i=0;i<pages[p].n;i++)drawbutton(u,p,i,0,0);frame=live;}
+/* SETTINGS: the machine's address, so it can be reached over SSH. Read straight from the interfaces (no helper program),
+   preferring Wi-Fi, then wired, over anything else that is up (postmarketOS's usb0 gadget network, for one).
+   Returns 0 with "NO NETWORK" when there is no IPv4 address. */
+static int net_info(char*l1,size_t n1,char*l2,size_t n2){
+ struct ifaddrs*all;char ip[INET_ADDRSTRLEN]="",ifn[IFNAMSIZ]="",host[64]="";int found=0,best=9;
+ if(gethostname(host,sizeof host-1))strcpy(host,"?");
+ if(!getifaddrs(&all)){for(struct ifaddrs*i=all;i;i=i->ifa_next){
+   if(!i->ifa_addr||i->ifa_addr->sa_family!=AF_INET||(i->ifa_flags&IFF_LOOPBACK)||!(i->ifa_flags&IFF_UP))continue;
+   int rank=!strncmp(i->ifa_name,"wl",2)?0:i->ifa_name[0]=='e'?1:2;found++;
+   if(rank<best){best=rank;inet_ntop(AF_INET,&((struct sockaddr_in*)i->ifa_addr)->sin_addr,ip,sizeof ip);snprintf(ifn,sizeof ifn,"%s",i->ifa_name);}}
+  freeifaddrs(all);}
+ if(!found){snprintf(l1,n1,"NO NETWORK");snprintf(l2,n2,"CLOSE, then set up Wi-Fi on the desktop");return 0;}
+ if(found>1)snprintf(l1,n1,"IP %s  +%d",ip,found-1);else snprintf(l1,n1,"IP %s",ip);
+ snprintf(l2,n2,"%s  -  %s",ifn,host);return 1;}
+/* The information box across the SETTINGS cells: dimmer than a button and with no pressed state, as it does nothing. Drawn
+   into the chrome, like the strip, and only when its text changes. */
+static void draw_info(const struct ui*u,const char*l1,const char*l2,int up){uint32_t *live=frame;frame=chrome;
+ int x,y,w,h,x2,y2,w2,h2;button_rect(u,SETTINGS_INFO_FIRST,&x,&y,&w,&h);button_rect(u,SETTINGS_INFO_FIRST+SETTINGS_INFO_CELLS-1,&x2,&y2,&w2,&h2);
+ w=x2+w2-x;int m=PX(4),room=w-PX(24);box(x+m,y+m,w-2*m,h-2*m,0x1c2a35);
+ label(x+w/2,y+h*2/5,l1,fitsize(l1,room,PX(26)),up?0xffffff:0x8a98a4);label(x+w/2,y+h*3/4,l2,fitsize(l2,room,PX(18)),0xa9b6c1);
+ frame=live;}
+static long ms(void){struct timespec t;clock_gettime(CLOCK_MONOTONIC,&t);return t.tv_sec*1000+t.tv_nsec/1000000;}
 /* Slider i from its 160x333 design box (slider_box gives the origin and scale; the touch bridge inverts the same numbers). */
 static void drawslider(const struct ui*u,int i,const struct ui_state*st,int fresh){
  int x,y;double s;slider_box(u,i,&x,&y,&s);
@@ -116,11 +142,13 @@ int main(int argc,char**argv){
   for(int i=0;fonts[i];i++) fprintf(stderr,"  %s\n",fonts[i]);
   return 1;
  }
- int shown=-1;
+ int shown=-1;long net_at=0;char net1[64]="",net2[96]="";
  for(;;){
  int mode=ui_mode_now(base_mode,state);if(mode!=laid){relayout(mode);shown=-1;}   /* at start, and on SETTINGS > BARS */
  int pg=state->page>=0&&state->page<NPAGES?state->page:0;
- if(u.sh&&pg!=shown){draw_strip(&u,pg);shown=pg;}
+ if(u.sh&&pg!=shown){draw_strip(&u,pg);shown=pg;net_at=0;}   /* a fresh strip has no information box yet */
+ if(u.sh&&pg==PAGE_SETTINGS&&ms()>=net_at){char a[64],b[96];int up=net_info(a,sizeof a,b,sizeof b);   /* every 5 s */
+  if(!net_at||strcmp(a,net1)||strcmp(b,net2)){strcpy(net1,a);strcpy(net2,b);draw_info(&u,net1,net2,up);}net_at=ms()+5000;}
  memcpy(frame,chrome,sizeof(uint32_t)*UW*UH);
  for(int y=0;y<u.ch;y++){uint32_t *out=frame+(u.cy+y)*UW+u.cx;const uint32_t *in=s+row[y]*SRC_W;
   if(!filter)for(int x=0;x<u.cw;x++)out[x]=in[col[x]];

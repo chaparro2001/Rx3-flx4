@@ -78,7 +78,10 @@ static const struct button deck2_buttons[]={
  LIT("MASTER TEMPO 2","MT 2",0x4108,2,DECK_MASTER_TEMPO,C_DECK),LIT("QUANTIZE 2","Q 2",0x410b,2,DECK_QUANTIZE,C_DECK),EMPTY,EMPTY,EMPTY,EMPTY,EMPTY,EMPTY,EMPTY,
  {"BACK",0,0,0,0,0,PAGE_MAIN,0,C_KEY}
 };
-/* BARS is drawn lit while the bars are on screen (fb-present.c), not from a deck bit. */
+/* BARS is drawn lit while the bars are on screen (fb-present.c), not from a deck bit. Cells SETTINGS_INFO_FIRST.. are empty
+   here, so touches pass through them, and the presenter draws one information box across them: the machine's IP address. */
+#define SETTINGS_INFO_FIRST 2
+#define SETTINGS_INFO_CELLS 4
 static const struct button settings_buttons[]={
  KEY("BARS",0,CMD_BARS,0,C_SET),KEY("CLOSE (hold)","CLOSE",CMD_CLOSE,0,C_STOP),EMPTY,EMPTY,EMPTY,EMPTY,EMPTY,EMPTY,EMPTY,
  {"BACK",0,0,0,0,0,PAGE_MAIN,0,C_KEY}
