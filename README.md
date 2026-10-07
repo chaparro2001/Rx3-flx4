@@ -21,12 +21,12 @@ panel as large as it fits at 16:10, with an on-screen control strip around it - 
 matched against a short profile list (`displays.py list`); rotation, chrome size and touch-axis fixes are one
 line each in `rx3.conf`. A USB mouse works as a pointer when there is no touch panel.
 
-**The on-screen strip.** Two rows of ten buttons, in pages. Row 1 is the browser on every page: SOURCE, BROWSE,
-SHORTCUT, SEARCH, UTILITY, BACK, UP/DOWN, ENTER. Row 2 on the main page: DECK 1, X-FADER (crossfader on/off), SETTINGS,
-DECK 2. Each DECK page holds that deck's LOAD, USB STOP, PLAY/PAUSE, MASTER TEMPO and QUANTIZE, marked in the deck's
-colour, with a jump to the other deck and << MAIN. SETTINGS has BARS (show or hide the slider bars, remembered), the
+**The on-screen strip.** Two rows of ten buttons, in pages. The main page has the browser in row 1 (SOURCE,
+BROWSE, SHORTCUT, SEARCH, UTILITY, BACK, UP/DOWN, ENTER) and DECK 1, X-FADER (crossfader on/off), SETTINGS and DECK 2
+in row 2. A DECK page is that deck alone, in larger buttons marked with the deck's colour: LOAD, PLAY/PAUSE, MASTER
+TEMPO, QUANTIZE, USB STOP and BACK. SETTINGS keeps the browser row and has BARS (show or hide the slider bars, remembered), the
 machine's IP address for SSH, and CLOSE (held 1 s: stop the player and, when it was started from the XDJ-RX3 icon,
-return to the desktop). Buttons that are toggles light up from
+return to the desktop), with << MAIN. Buttons that are toggles light up from
 the firmware's own state: PLAY, MASTER TEMPO, QUANTIZE, HP CUE, X-FADER. Two slider bars carry the channel
 faders, master and headphone levels and crossfader for use without a controller.
 

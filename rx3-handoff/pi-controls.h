@@ -37,10 +37,9 @@ struct ui_state {unsigned magic;float level[6];unsigned pressed;unsigned headpho
 #define UI_STATE_DECK_OFFSET 52
 _Static_assert(offsetof(struct ui_state,deck)==UI_STATE_DECK_OFFSET&&offsetof(struct ui_state,hotcue)==UI_STATE_DECK_OFFSET+12&&offsetof(struct ui_state,chlevel)==UI_STATE_DECK_OFFSET+20,"control-shim.c writes deck[2], state_seq, hotcue[2], chlevel[2] from this offset");
 /* The button strip: BUTTON_ROWS rows of BUTTON_COLS cells under the content area, showing one *page* of buttons at a
-   time. Row 1 is the same navigation row on every page, so the browser works from anywhere. Row 2 is the page's own:
-   the main page has DECK 1 / DECK 2 (into each deck's page), X-FADER and SETTINGS; a deck page has everything for that
-   deck, a jump to the other deck and << MAIN back to the main page (not "BACK": row 1 already has the firmware's BACK);
-   SETTINGS has BARS, CLOSE and the IP address.
+   time. The main page has the browser in row 1 and DECK 1 / DECK 2 (into each deck's page), X-FADER and SETTINGS in
+   row 2. A deck page is that deck alone, both rows, with larger buttons and a BACK to the main page. SETTINGS keeps the
+   browser row and has BARS, CLOSE and the IP address in row 2, with << MAIN (not "BACK": row 1 has the firmware's).
    A page button sends nothing to the firmware. An entry with no label is an empty cell (drawn as background, touches
    ignored), as are cells past the page's count; so are the cells a wider button (`span`) covers.
    `scroll` makes the button a repeating rotary step (the browse selector); `hold` adds the firmware's operation 1
@@ -66,25 +65,26 @@ enum {PAGE_MAIN,PAGE_DECK1,PAGE_DECK2,PAGE_SETTINGS,NPAGES};
 #define DECK2_COLOR 0xf08a24    /* orange */
 #define KEY(l,b,k,ch,col) {l,b,k,ch,0,0,-1,0,col,0,0}
 #define LIT(l,b,k,ch,bit,col) {l,b,k,ch,0,0,-1,bit,col,0,0}
-#define DKEY(l,b,k,ch,col) {l,b,k,ch,0,0,-1,0,col,0,ch}                 /* a deck's own button: marked with its colour */
-#define DLIT(l,b,k,ch,bit,col) {l,b,k,ch,0,0,-1,bit,col,0,ch}
+#define DKEY(l,b,k,ch,col,span) {l,b,k,ch,0,0,-1,0,col,span,ch}          /* a deck's own button: marked with its colour */
+#define DLIT(l,b,k,ch,bit,col,span) {l,b,k,ch,0,0,-1,bit,col,span,ch}
 #define GOTO(l,b,pg,col,span,deck) {l,b,0,0,0,0,pg,0,col,span,deck}    /* switch to page `pg` */
 #define EMPTY {0,0,0,0,0,0,-1,0,0,0,0}
 #define NAV_ROW \
  KEY("SOURCE",0,0x201,0,C_NAV),KEY("BROWSE",0,0x202,0,C_NAV),KEY("SHORTCUT",0,0x210,0,C_SET),KEY("SEARCH",0,0x205,0,C_SET), \
  {"UTILITY",0,0x206,0,0,1,-1,0,C_SET,0,0},KEY("BACK",0,0x420d,0,C_KEY),{"UP",0,0x420c,0,-1,0,-1,0,C_KEY,0,0},{"DOWN",0,0x420c,0,1,0,-1,0,C_KEY,0,0}, \
  KEY("ENTER",0,0x420c,0,C_KEY),EMPTY
-/* A deck page's row 2: LOAD, USB STOP, PLAY, MASTER TEMPO, QUANTIZE, room to grow, the other deck, << MAIN. */
-#define DECK_ROW(n,other,pother) \
- DKEY("LOAD " #n,0,0x4311,n,C_LOAD),DKEY("USB STOP " #n " (hold)","EJECT " #n,0x8002,n,C_STOP), \
- DLIT("PLAY / PAUSE " #n,"PLAY " #n,0x4101,n,DECK_PLAYING,C_PLAY),DLIT("MASTER TEMPO " #n,"MT " #n,0x4108,n,DECK_MASTER_TEMPO,C_DECK), \
- DLIT("QUANTIZE " #n,"Q " #n,0x410b,n,DECK_QUANTIZE,C_DECK),EMPTY,EMPTY,EMPTY, \
- GOTO("DECK " #other " >>",0,pother,C_DECK,1,other),GOTO("<< MAIN",0,PAGE_MAIN,C_KEY,1,0)
+/* A deck page, cells by span:  LOAD 2 | PLAY / PAUSE 4 | MASTER TEMPO 2 | QUANTIZE 2
+                               USB STOP 2 | (6 free: SYNC, CUE, loops ...) | BACK 2 */
+#define DECK_PAGE(n) \
+ DKEY("LOAD " #n,0,0x4311,n,C_LOAD,2),EMPTY,DLIT("PLAY / PAUSE " #n,"PLAY " #n,0x4101,n,DECK_PLAYING,C_PLAY,4),EMPTY,EMPTY,EMPTY, \
+ DLIT("MASTER TEMPO " #n,"MT " #n,0x4108,n,DECK_MASTER_TEMPO,C_DECK,2),EMPTY,DLIT("QUANTIZE " #n,"Q " #n,0x410b,n,DECK_QUANTIZE,C_DECK,2),EMPTY, \
+ DKEY("USB STOP " #n " (hold)","EJECT " #n,0x8002,n,C_STOP,2),EMPTY,EMPTY,EMPTY,EMPTY,EMPTY,EMPTY,EMPTY, \
+ GOTO("BACK",0,PAGE_MAIN,C_KEY,2,0),EMPTY
 static const struct button main_buttons[]={NAV_ROW,
  GOTO("DECK 1",0,PAGE_DECK1,C_DECK,2,1),EMPTY,EMPTY,EMPTY,LIT("X-FADER","XF",CMD_XFADER,1,DECK_XFADER,C_SET),
  GOTO("SETTINGS",0,PAGE_SETTINGS,C_SET,1,0),EMPTY,EMPTY,GOTO("DECK 2",0,PAGE_DECK2,C_DECK,2,2),EMPTY};
-static const struct button deck1_buttons[]={NAV_ROW,DECK_ROW(1,2,PAGE_DECK2)};
-static const struct button deck2_buttons[]={NAV_ROW,DECK_ROW(2,1,PAGE_DECK1)};
+static const struct button deck1_buttons[]={DECK_PAGE(1)};
+static const struct button deck2_buttons[]={DECK_PAGE(2)};
 /* BARS is drawn lit while the bars are on screen (fb-present.c), not from a deck bit. Cells SETTINGS_INFO_FIRST.. are empty
    here, so touches pass through them, and the presenter draws one information box across them: the machine's IP address. */
 #define SETTINGS_INFO_FIRST (BUTTON_COLS+2)
