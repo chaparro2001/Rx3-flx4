@@ -37,7 +37,7 @@ struct ui_state {unsigned magic;float level[6];unsigned pressed;unsigned headpho
 #define UI_STATE_DECK_OFFSET 52
 _Static_assert(offsetof(struct ui_state,deck)==UI_STATE_DECK_OFFSET&&offsetof(struct ui_state,hotcue)==UI_STATE_DECK_OFFSET+12&&offsetof(struct ui_state,chlevel)==UI_STATE_DECK_OFFSET+20,"control-shim.c writes deck[2], state_seq, hotcue[2], chlevel[2] from this offset");
 /* The button strip: BUTTON_ROWS rows of BUTTON_COLS cells under the content area, showing one *page* of buttons at a
-   time. The main page has DECK 1 and DECK 2 as tall buttons at either end (into each deck's page) and the browser,
+   time. The main page has DECK 1 and DECK 2 as large 2x2 buttons at either end (into each deck's page) and the browser,
    SETTINGS and X-FADER between them. A deck page is that deck alone, both rows, with larger buttons and a BACK to the main page. SETTINGS keeps the
    browser row and has BARS, CLOSE and the IP address in row 2, with << MAIN (not "BACK": row 1 has the firmware's).
    A page button sends nothing to the firmware. An entry with no label is an empty cell (drawn as background, touches
@@ -69,7 +69,7 @@ enum {PAGE_MAIN,PAGE_DECK1,PAGE_DECK2,PAGE_SETTINGS,NPAGES};
 #define DKEY(l,b,k,ch,col,span) {l,b,k,ch,0,0,-1,0,col,span,ch}          /* a deck's own button: marked with its colour */
 #define DLIT(l,b,k,ch,bit,col,span) {l,b,k,ch,0,0,-1,bit,col,span,ch}
 #define GOTO(l,b,pg,col,span,deck) {l,b,0,0,0,0,pg,0,col,span,deck}    /* switch to page `pg` */
-#define TALL_GOTO(l,pg,deck) {l,0,0,0,0,0,pg,0,C_DECK,1,deck,2}           /* ... as a button the height of the strip */
+#define TALL_GOTO(l,pg,deck) {l,0,0,0,0,0,pg,0,C_DECK,2,deck,2}           /* ... as a 2x2 button, the height of the strip */
 #define EMPTY {0,0,0,0,0,0,-1,0,0,0,0}
 #define NAV_ROW \
  KEY("SOURCE",0,0x201,0,C_NAV),KEY("BROWSE",0,0x202,0,C_NAV),KEY("SHORTCUT",0,0x210,0,C_SET),KEY("SEARCH",0,0x205,0,C_SET), \
@@ -82,14 +82,14 @@ enum {PAGE_MAIN,PAGE_DECK1,PAGE_DECK2,PAGE_SETTINGS,NPAGES};
  DLIT("MASTER TEMPO " #n,"MT " #n,0x4108,n,DECK_MASTER_TEMPO,C_DECK,2),EMPTY,DLIT("QUANTIZE " #n,"Q " #n,0x410b,n,DECK_QUANTIZE,C_DECK,2),EMPTY, \
  DKEY("USB STOP " #n " (hold)","EJECT " #n,0x8002,n,C_STOP,2),EMPTY,EMPTY,EMPTY,EMPTY,EMPTY,EMPTY,EMPTY, \
  GOTO("BACK",0,PAGE_MAIN,C_KEY,2,0),EMPTY
-/* Main page:  DECK 1 | SOURCE BROWSE SHORTCUT SEARCH UTILITY SETTINGS  .   .  | DECK 2
-                (tall) | BACK   UP     DOWN     ENTER  X-FADER   .      .   .  | (tall) */
+/* Main page:  DECK 1 | SOURCE BROWSE SHORTCUT SEARCH UTILITY SETTINGS | DECK 2
+                (2x2)  | BACK   UP     DOWN     ENTER  X-FADER   .       | (2x2) */
 static const struct button main_buttons[]={
- TALL_GOTO("DECK 1",PAGE_DECK1,1),KEY("SOURCE",0,0x201,0,C_NAV),KEY("BROWSE",0,0x202,0,C_NAV),KEY("SHORTCUT",0,0x210,0,C_SET),
- KEY("SEARCH",0,0x205,0,C_SET),{"UTILITY",0,0x206,0,0,1,-1,0,C_SET,0,0},GOTO("SETTINGS",0,PAGE_SETTINGS,C_SET,1,0),EMPTY,EMPTY,
- TALL_GOTO("DECK 2",PAGE_DECK2,2),
- EMPTY,KEY("BACK",0,0x420d,0,C_KEY),{"UP",0,0x420c,0,-1,0,-1,0,C_KEY,0,0},{"DOWN",0,0x420c,0,1,0,-1,0,C_KEY,0,0},KEY("ENTER",0,0x420c,0,C_KEY),
- LIT("X-FADER","XF",CMD_XFADER,1,DECK_XFADER,C_SET),EMPTY,EMPTY,EMPTY,EMPTY};
+ TALL_GOTO("DECK 1",PAGE_DECK1,1),EMPTY,KEY("SOURCE",0,0x201,0,C_NAV),KEY("BROWSE",0,0x202,0,C_NAV),KEY("SHORTCUT",0,0x210,0,C_SET),
+ KEY("SEARCH",0,0x205,0,C_SET),{"UTILITY",0,0x206,0,0,1,-1,0,C_SET,0,0},GOTO("SETTINGS",0,PAGE_SETTINGS,C_SET,1,0),
+ TALL_GOTO("DECK 2",PAGE_DECK2,2),EMPTY,
+ EMPTY,EMPTY,KEY("BACK",0,0x420d,0,C_KEY),{"UP",0,0x420c,0,-1,0,-1,0,C_KEY,0,0},{"DOWN",0,0x420c,0,1,0,-1,0,C_KEY,0,0},KEY("ENTER",0,0x420c,0,C_KEY),
+ LIT("X-FADER","XF",CMD_XFADER,1,DECK_XFADER,C_SET),EMPTY,EMPTY,EMPTY};
 static const struct button deck1_buttons[]={DECK_PAGE(1)};
 static const struct button deck2_buttons[]={DECK_PAGE(2)};
 /* BARS is drawn lit while the bars are on screen (fb-present.c), not from a deck bit. Cells SETTINGS_INFO_FIRST.. are empty

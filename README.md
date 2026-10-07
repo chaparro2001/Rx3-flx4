@@ -21,7 +21,7 @@ panel as large as it fits at 16:10, with an on-screen control strip around it - 
 matched against a short profile list (`displays.py list`); rotation, chrome size and touch-axis fixes are one
 line each in `rx3.conf`. A USB mouse works as a pointer when there is no touch panel.
 
-**The on-screen strip.** Two rows of ten buttons, in pages. The main page has DECK 1 and DECK 2 as tall buttons at
+**The on-screen strip.** Two rows of ten buttons, in pages. The main page has DECK 1 and DECK 2 as large 2x2 buttons at
 either end, with the browser (SOURCE, BROWSE, SHORTCUT, SEARCH, UTILITY, BACK, UP/DOWN, ENTER), SETTINGS and X-FADER
 (crossfader on/off) between them. A DECK page is that deck alone, in larger buttons marked with the deck's colour: LOAD, PLAY/PAUSE, MASTER
 TEMPO, QUANTIZE, USB STOP and BACK. SETTINGS keeps the browser row and has BARS (show or hide the slider bars, remembered), the
