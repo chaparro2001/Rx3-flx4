@@ -42,10 +42,12 @@ static const char *button_text(int p,int i,int w,int *size){
   if(textwidth(b->label,sizes[p][i])>room&&b->brief){text[p][i]=b->brief;sizes[p][i]=fitsize(b->brief,room,want);}}
  *size=sizes[p][i];return text[p][i];}
 static uint32_t lighten(uint32_t c){uint32_t r=0;for(int k=0;k<3;k++){unsigned v=(c>>(k*8))&255;v+=(255-v)*2/5;r|=v<<(k*8);}return r;}
-/* A lit button (engine says its toggle is on) is drawn paler with a bright bar along its bottom edge. */
+/* A lit button (engine says its toggle is on) is drawn paler with a bright bar along its bottom edge; a deck's own
+   buttons carry that deck's colour along the top. */
 static void drawbutton(const struct ui*u,int p,int i,int down,int lit){int x,y,w,h,size;const struct button*b=&pages[p].buttons[i];
- if(!b->label)return;button_rect(u,i,&x,&y,&w,&h);
+ if(!b->label)return;button_box(u,b,i,&x,&y,&w,&h);
  int m=PX(4);box(x+m,y+m,w-2*m,h-2*m,down?0x536f84:lit?lighten(b->color):b->color);
+ if(b->deck)box(x+m,y+m,w-2*m,PX(5),b->deck==1?DECK1_COLOR:DECK2_COLOR);   /* which deck the button belongs to */
  if(lit)box(x+m,y+h-m-PX(6),w-2*m,PX(6),0xeaf3fa);
  const char *t=button_text(p,i,w,&size);label(x+w/2,y+h/2,t,size,0xffffff);}
 /* The deck flags are trusted only while the shim keeps bumping state_seq (it stops with the player). */

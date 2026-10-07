@@ -37,19 +37,23 @@ struct ui_state {unsigned magic;float level[6];unsigned pressed;unsigned headpho
 #define UI_STATE_DECK_OFFSET 52
 _Static_assert(offsetof(struct ui_state,deck)==UI_STATE_DECK_OFFSET&&offsetof(struct ui_state,hotcue)==UI_STATE_DECK_OFFSET+12&&offsetof(struct ui_state,chlevel)==UI_STATE_DECK_OFFSET+20,"control-shim.c writes deck[2], state_seq, hotcue[2], chlevel[2] from this offset");
 /* The button strip: BUTTON_ROWS rows of BUTTON_COLS cells under the content area, showing one *page* of buttons at a
-   time. The main page has navigation on row 1 and the decks on row 2; DECK 1 / DECK 2 switch to a page with that deck's
-   toggles and a BACK that returns to the main page; SETTINGS likewise, with BARS and CLOSE. A page button sends nothing to the firmware. An entry with no label
-   is an empty cell (drawn as background, touches ignored), as are cells past the page's count.
+   time. Row 1 is the same navigation row on every page, so the browser works from anywhere. Row 2 is the page's own:
+   the main page has DECK 1 / DECK 2 (into each deck's page), X-FADER and SETTINGS; a deck page has everything for that
+   deck, a jump to the other deck and << MAIN back to the main page (not "BACK": row 1 already has the firmware's BACK);
+   SETTINGS has BARS, CLOSE and the IP address.
+   A page button sends nothing to the firmware. An entry with no label is an empty cell (drawn as background, touches
+   ignored), as are cells past the page's count; so are the cells a wider button (`span`) covers.
    `scroll` makes the button a repeating rotary step (the browse selector); `hold` adds the firmware's operation 1
-   ("long-pressed") right after the press - UTILITY is the panel's MENU key (0x206) held down. QUANTIZE and MASTER
-   TEMPO are toggles whose state only the RX3's own deck display shows (the firmware reports no LED state to us). */
+   ("long-pressed") right after the press - UTILITY is the panel's MENU key (0x206) held down. */
 #define BUTTON_COLS 10
 #define BUTTON_ROWS 2
 #define NBUTTONS (BUTTON_COLS*BUTTON_ROWS)     /* cells per page */
 /* `brief` is drawn instead of `label` when the cell is too narrow for the full text even at the smallest font.
    `page` >= 0 makes the button switch the strip to that page instead of sending `key`.
-   `light` is a DECK_* bit: the button is drawn lit while the engine reports it set for `channel`. */
-struct button {const char *label,*brief;int key,channel,scroll,hold,page,light;unsigned color;};
+   `light` is a DECK_* bit: the button is drawn lit while the engine reports it set for `channel`.
+   `span` > 1 widens the button over the next cells of its row (leave them EMPTY). `deck` 1/2 draws that deck's colour
+   along the button's top edge, so it is plain which deck a button belongs to. */
+struct button {const char *label,*brief;int key,channel,scroll,hold,page,light;unsigned color;int span,deck;};
 enum {PAGE_MAIN,PAGE_DECK1,PAGE_DECK2,PAGE_SETTINGS,NPAGES};
 #define C_NAV 0x08699c
 #define C_SET 0x4b3a6d
@@ -58,33 +62,36 @@ enum {PAGE_MAIN,PAGE_DECK1,PAGE_DECK2,PAGE_SETTINGS,NPAGES};
 #define C_STOP 0x7a2f2f
 #define C_PLAY 0x12623a
 #define C_DECK 0x5a4a1f
-#define KEY(l,b,k,ch,col) {l,b,k,ch,0,0,-1,0,col}
-#define LIT(l,b,k,ch,bit,col) {l,b,k,ch,0,0,-1,bit,col}
-#define EMPTY {0,0,0,0,0,0,-1,0,0}
-static const struct button main_buttons[]={
- KEY("SOURCE",0,0x201,0,C_NAV),KEY("BROWSE",0,0x202,0,C_NAV),KEY("SHORTCUT",0,0x210,0,C_SET),KEY("SEARCH",0,0x205,0,C_SET),
- {"UTILITY",0,0x206,0,0,1,-1,0,C_SET},KEY("BACK",0,0x420d,0,C_KEY),{"UP",0,0x420c,0,-1,0,-1,0,C_KEY},{"DOWN",0,0x420c,0,1,0,-1,0,C_KEY},
- KEY("ENTER",0,0x420c,0,C_KEY),LIT("X-FADER","XF",CMD_XFADER,1,DECK_XFADER,C_SET),
- KEY("LOAD 1",0,0x4311,1,C_LOAD),KEY("USB STOP 1 (hold)","EJECT 1",0x8002,1,C_STOP),LIT("PLAY / PAUSE 1","PLAY 1",0x4101,1,DECK_PLAYING,C_PLAY),
- {"DECK 1",0,0,0,0,0,PAGE_DECK1,0,C_DECK},{"SETTINGS",0,0,0,0,0,PAGE_SETTINGS,0,C_SET},
- KEY("LOAD 2",0,0x4311,2,C_LOAD),KEY("USB STOP 2 (hold)","EJECT 2",0x8002,2,C_STOP),LIT("PLAY / PAUSE 2","PLAY 2",0x4101,2,DECK_PLAYING,C_PLAY),
- {"DECK 2",0,0,0,0,0,PAGE_DECK2,0,C_DECK}
-};
-static const struct button deck1_buttons[]={
- LIT("MASTER TEMPO 1","MT 1",0x4108,1,DECK_MASTER_TEMPO,C_DECK),LIT("QUANTIZE 1","Q 1",0x410b,1,DECK_QUANTIZE,C_DECK),EMPTY,EMPTY,EMPTY,EMPTY,EMPTY,EMPTY,EMPTY,
- {"BACK",0,0,0,0,0,PAGE_MAIN,0,C_KEY}
-};
-static const struct button deck2_buttons[]={
- LIT("MASTER TEMPO 2","MT 2",0x4108,2,DECK_MASTER_TEMPO,C_DECK),LIT("QUANTIZE 2","Q 2",0x410b,2,DECK_QUANTIZE,C_DECK),EMPTY,EMPTY,EMPTY,EMPTY,EMPTY,EMPTY,EMPTY,
- {"BACK",0,0,0,0,0,PAGE_MAIN,0,C_KEY}
-};
+#define DECK1_COLOR 0x1aa3d9    /* cyan */
+#define DECK2_COLOR 0xf08a24    /* orange */
+#define KEY(l,b,k,ch,col) {l,b,k,ch,0,0,-1,0,col,0,0}
+#define LIT(l,b,k,ch,bit,col) {l,b,k,ch,0,0,-1,bit,col,0,0}
+#define DKEY(l,b,k,ch,col) {l,b,k,ch,0,0,-1,0,col,0,ch}                 /* a deck's own button: marked with its colour */
+#define DLIT(l,b,k,ch,bit,col) {l,b,k,ch,0,0,-1,bit,col,0,ch}
+#define GOTO(l,b,pg,col,span,deck) {l,b,0,0,0,0,pg,0,col,span,deck}    /* switch to page `pg` */
+#define EMPTY {0,0,0,0,0,0,-1,0,0,0,0}
+#define NAV_ROW \
+ KEY("SOURCE",0,0x201,0,C_NAV),KEY("BROWSE",0,0x202,0,C_NAV),KEY("SHORTCUT",0,0x210,0,C_SET),KEY("SEARCH",0,0x205,0,C_SET), \
+ {"UTILITY",0,0x206,0,0,1,-1,0,C_SET,0,0},KEY("BACK",0,0x420d,0,C_KEY),{"UP",0,0x420c,0,-1,0,-1,0,C_KEY,0,0},{"DOWN",0,0x420c,0,1,0,-1,0,C_KEY,0,0}, \
+ KEY("ENTER",0,0x420c,0,C_KEY),EMPTY
+/* A deck page's row 2: LOAD, USB STOP, PLAY, MASTER TEMPO, QUANTIZE, room to grow, the other deck, << MAIN. */
+#define DECK_ROW(n,other,pother) \
+ DKEY("LOAD " #n,0,0x4311,n,C_LOAD),DKEY("USB STOP " #n " (hold)","EJECT " #n,0x8002,n,C_STOP), \
+ DLIT("PLAY / PAUSE " #n,"PLAY " #n,0x4101,n,DECK_PLAYING,C_PLAY),DLIT("MASTER TEMPO " #n,"MT " #n,0x4108,n,DECK_MASTER_TEMPO,C_DECK), \
+ DLIT("QUANTIZE " #n,"Q " #n,0x410b,n,DECK_QUANTIZE,C_DECK),EMPTY,EMPTY,EMPTY, \
+ GOTO("DECK " #other " >>",0,pother,C_DECK,1,other),GOTO("<< MAIN",0,PAGE_MAIN,C_KEY,1,0)
+static const struct button main_buttons[]={NAV_ROW,
+ GOTO("DECK 1",0,PAGE_DECK1,C_DECK,2,1),EMPTY,EMPTY,EMPTY,LIT("X-FADER","XF",CMD_XFADER,1,DECK_XFADER,C_SET),
+ GOTO("SETTINGS",0,PAGE_SETTINGS,C_SET,1,0),EMPTY,EMPTY,GOTO("DECK 2",0,PAGE_DECK2,C_DECK,2,2),EMPTY};
+static const struct button deck1_buttons[]={NAV_ROW,DECK_ROW(1,2,PAGE_DECK2)};
+static const struct button deck2_buttons[]={NAV_ROW,DECK_ROW(2,1,PAGE_DECK1)};
 /* BARS is drawn lit while the bars are on screen (fb-present.c), not from a deck bit. Cells SETTINGS_INFO_FIRST.. are empty
    here, so touches pass through them, and the presenter draws one information box across them: the machine's IP address. */
-#define SETTINGS_INFO_FIRST 2
+#define SETTINGS_INFO_FIRST (BUTTON_COLS+2)
 #define SETTINGS_INFO_CELLS 4
-static const struct button settings_buttons[]={
+static const struct button settings_buttons[]={NAV_ROW,
  KEY("BARS",0,CMD_BARS,0,C_SET),KEY("CLOSE (hold)","CLOSE",CMD_CLOSE,0,C_STOP),EMPTY,EMPTY,EMPTY,EMPTY,EMPTY,EMPTY,EMPTY,
- {"BACK",0,0,0,0,0,PAGE_MAIN,0,C_KEY}
+ GOTO("<< MAIN",0,PAGE_MAIN,C_KEY,1,0)
 };
 struct page {const struct button *buttons;int n;};
 #define PAGE(t) {t,(int)(sizeof(t)/sizeof*(t))}
@@ -134,12 +141,18 @@ static inline void button_rect(const struct ui*u,int i,int*x,int*y,int*w,int*h){
  int col=i%BUTTON_COLS,row=i/BUTTON_COLS,base=u->sw/BUTTON_COLS,extra=u->sw%BUTTON_COLS;
  *x=u->sx+col*base+(col<extra?col:extra);*w=base+(col<extra);
  *y=u->sy+row*u->sh/BUTTON_ROWS;*h=u->sy+(row+1)*u->sh/BUTTON_ROWS-*y;}
-/* Which button of page `pg` a UI point lands on, or -1 for the empty cells and everything outside the strip. */
+/* Button i's box: its cell, widened over the next `span`-1 cells of the row. */
+static inline void button_box(const struct ui*u,const struct button*b,int i,int*x,int*y,int*w,int*h){
+ button_rect(u,i,x,y,w,h);int last=i+(b->span>1?b->span-1:0),x2,y2,w2,h2;
+ if(last/BUTTON_COLS!=i/BUTTON_COLS)last=(i/BUTTON_COLS+1)*BUTTON_COLS-1;   /* never past the end of its row */
+ if(last>i){button_rect(u,last,&x2,&y2,&w2,&h2);*w=x2+w2-*x;}}
+/* Which button of page `pg` a UI point lands on, or -1 for the empty cells and everything outside the strip. A wide
+   button is found from any of the cells it covers. */
 static inline int button_at(const struct ui*u,const struct page*pg,int x,int y){
  if(u->sh==0||y<u->sy||y>=u->sy+u->sh)return -1;
  int row=0;while(row<BUTTON_ROWS-1&&y>=u->sy+(row+1)*u->sh/BUTTON_ROWS)row++;   /* same split as button_rect */
- for(int col=0;col<BUTTON_COLS;col++){int i=row*BUTTON_COLS+col,bx,by,bw,bh;if(i>=pg->n)break;
-  button_rect(u,i,&bx,&by,&bw,&bh);if(x>=bx&&x<bx+bw)return pg->buttons[i].label?i:-1;}
+ for(int col=0;col<BUTTON_COLS;){int i=row*BUTTON_COLS+col,bx,by,bw,bh;if(i>=pg->n)break;const struct button*b=&pg->buttons[i];
+  button_box(u,b,i,&bx,&by,&bw,&bh);if(x>=bx&&x<bx+bw)return b->label?i:-1;col+=b->span>1?b->span:1;}
  return -1;}
 static inline const struct page *page_of(int n){return &pages[n>=0&&n<NPAGES?n:0];}
 /* Slider i (0-2 left bar, 3-5 right bar) is drawn from a 160x333 design box: its origin and the scale that
