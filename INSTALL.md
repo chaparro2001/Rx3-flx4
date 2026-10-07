@@ -9,6 +9,12 @@ particular username: the scripts work out where they live and which account owns
 > `git fetch origin && git reset --hard origin/$(git branch --show-current)`, or re-clone. Nothing you have
 > built or installed is affected.
 
+> **postmarketOS (e.g. Lenovo IdeaPad Duet):** one script does all of the steps below:
+> `git clone https://github.com/mutlisensor/Rx3-flx4.git && sh Rx3-flx4/rx3-handoff/install-pmos.sh`.
+> It needs the **systemd** edition of postmarketOS and a kernel that runs 32-bit ARM programs (it checks both).
+> Alpine has no `gcc-arm-linux-gnueabi`, so it builds the shim with clang and Alpine's armv7 headers instead.
+> Not yet verified on a device.
+
 ## 1. Get the files and the packages
 
 ```bash

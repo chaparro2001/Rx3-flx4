@@ -6,6 +6,9 @@
 extern int close(int);
 extern char *program_invocation_short_name;
 extern int pthread_create(unsigned long*,const void*,void *(*)(void*),void*);
+/* The firmware's glibc pwrite takes a 32-bit off_t. Bound by symbol name so the call keeps that ABI whichever headers
+   build the shim: musl's (postmarketOS, built with clang) declare a 64-bit off_t, which would move the offset onto the stack. */
+extern long pwrite32(int,const void*,unsigned long,long) __asm__("pwrite");
 struct command {int key,operation,channel,value;float analog;int extra;};
 /* State query (key 0xFFFF on the control FIFO): dump engine state via the firmware's own DjEngineIF getters to /tmp/rx3-query.txt. */
 static char *putnum(char *p,long v){char t[16];int n=0;if(v<0){*p++='-';v=-v;}do{t[n++]='0'+v%10;v/=10;}while(v);while(n)*p++=t[--n];return p;}
@@ -101,7 +104,7 @@ static void *state_thread(void *unused){
   for(int i=0;i<2;i++){st[i]=((playing(eng,i)&0xff)?1:0)|((mtempo(eng,i)&0xff)?2:0)|(quantize(i)?4:0)|((hpcue(eng,i)&0xff)?8:0)|((looping(eng,i)&0xff)?16:0)|((reloop(eng,i)&0xff)?32:0)
    |((syncon(eng,i)&0xff)?64:0)|(sm==i?128:0)|xf;
    unsigned m=0;for(int t=1;t<=8;t++)if(hotcue(eng,i,t)&0xff)m|=1u<<(t-1);st[3+i]=m;st[5+i]=(unsigned)level(eng,i);}
-  st[2]=++seq;pwrite(fd,st,sizeof st,52);usleep(50000);}   /* 20 Hz: the level meters want it, the rest does not mind */
+  st[2]=++seq;pwrite32(fd,st,sizeof st,52);usleep(50000);}   /* 20 Hz: the level meters want it, the rest does not mind */
  return 0;
 }
 __attribute__((constructor))static void start_control(void){

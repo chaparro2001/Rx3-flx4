@@ -25,7 +25,7 @@ systemctl stop $UNIT.service 2>/dev/null || true; systemctl reset-failed $UNIT.s
 systemd-run --quiet --unit=$UNIT --collect -- fuse-overlayfs -f -o lowerdir=$LOWER,upperdir=$UPPER,workdir=$WORK,allow_other,squash_to_uid=$RX3_UID,squash_to_gid=$RX3_UID $MP
 for i in $(seq 1 50); do mountpoint -q $MP && break; sleep 0.1; done
 mountpoint -q $MP || { echo "overlay for $PORT failed:"; journalctl -u $UNIT --no-pager | tail -5; exit 1; }
-# Read-only block node for the firmware's libblkid probe (volume label / fs type); group 44 = the player's gid.
-if [ -b "$SRC" ]; then rm -f $R/dev/$PART; mknod $R/dev/$PART b 0x$(stat -c %t "$SRC") 0x$(stat -c %T "$SRC"); chown root:44 $R/dev/$PART; chmod 640 $R/dev/$PART; fi
+# Read-only block node for the firmware's libblkid probe (volume label / fs type); group = the player's gid (video).
+if [ -b "$SRC" ]; then rm -f $R/dev/$PART; mknod $R/dev/$PART b 0x$(stat -c %t "$SRC") 0x$(stat -c %T "$SRC"); chown root:$RX3_GID $R/dev/$PART; chmod 640 $R/dev/$PART; fi
 $H/rx3-mtab.sh
 echo "overlay mounted at $MP (lower=$SRC ro, upper=$UPPER, unit $UNIT)"
