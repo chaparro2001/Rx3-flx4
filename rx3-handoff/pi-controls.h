@@ -34,6 +34,7 @@ struct ui_state {unsigned magic;float level[6];unsigned pressed;unsigned headpho
 #define DECK_SYNC 64         /* beat sync is on */
 #define DECK_MASTER 128      /* this player is the sync master */
 #define DECK_XFADER 256      /* the crossfader is assigned (CH1=A, CH2=B); clear = THRU, the crossfader does nothing. Set in both words. */
+#define DECK_BEATFX 512      /* the Beat FX is on (one effect for the mixer, so set in both words) */
 /* Keys above 0xFFF0 are commands for control-shim.c rather than firmware keys: */
 #define CMD_XFADER 0xFFFE    /* press toggles the crossfader assignment */
 #define CMD_CLOSE 0xFFFD     /* held 1 s: stop the player. Handled by touch-bridge.c itself (systemctl), never sent to the shim;

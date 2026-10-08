@@ -94,13 +94,14 @@ static void *state_thread(void *unused){
  int (*looping)(void*,int)=(void*)0x482e4,(*reloop)(void*,int)=(void*)0x48234;   /* isLooping(ch), isPossibleToReLoop(ch) */
  int (*syncon)(void*,int)=(void*)0x4b700,(*master)(void*)=(void*)0x4b450,(*mastervalid)(void*)=(void*)0x4b4f8;   /* isSyncOn(ch), getSyncMaster(), isSyncMasterValid() */
  int (*hotcue)(void*,int,int)=(void*)0x48b00;
+ int (*beatfx)(void*)=(void*)0x4d1bc;   /* isBeatEffectOn(): ignores `this`, asks the MixerEngine at 0x011493c0 (waited for below) */
  long (*level)(void*,int)=(void*)0x50170;                                         /* getInputChLevelMono(input): whole dB, 0x80000000 = no signal (seen on the player) */                                     /* isRegisteredHotCue(ch, EnCueType): hot cues A..H are types 1..8 (Player::backHotCueGate checks type-1 <= 7) */
  while(!*(void *volatile *)0x011492d8||!*(void *volatile *)0x011493c0)sleep(1);
  sleep(5);
  int fd;while((fd=open("/dev/rx3-ui-state",O_WRONLY))<0)sleep(1);   /* the presenter creates it */
  unsigned seq=0;
  for(;;){void *eng=*(void **)0x011492d8;unsigned st[7];int sm=(mastervalid(eng)&0xff)?master(eng):-1;
-  unsigned xf=xfader_assigned(eng)?256:0;
+  unsigned xf=(xfader_assigned(eng)?256:0)|((beatfx(eng)&0xff)?512:0);   /* mixer-wide bits, set in both words */
   for(int i=0;i<2;i++){st[i]=((playing(eng,i)&0xff)?1:0)|((mtempo(eng,i)&0xff)?2:0)|(quantize(i)?4:0)|((hpcue(eng,i)&0xff)?8:0)|((looping(eng,i)&0xff)?16:0)|((reloop(eng,i)&0xff)?32:0)
    |((syncon(eng,i)&0xff)?64:0)|(sm==i?128:0)|xf;
    unsigned m=0;for(int t=1;t<=8;t++)if(hotcue(eng,i,t)&0xff)m|=1u<<(t-1);st[3+i]=m;st[5+i]=(unsigned)level(eng,i);}

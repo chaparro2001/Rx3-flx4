@@ -215,6 +215,7 @@ threading.Thread(target=init_leds, daemon=True).start()
 # the counter stops moving (player gone).
 UI_STATE = ROOT + '/dev/rx3-ui-state'
 def deck_state_watch():
+    shown_fx = None
     shown = {1: None, 2: None}; shown_hp = {1: None, 2: None}; shown_loop = {1: None, 2: None}; shown_sync = {1: None, 2: None}; shown_level = {1: None, 2: None}; last_seq = None; last_change = time.time()
     hotcues[1] = hotcues[2] = None
     while True:
@@ -244,6 +245,9 @@ def deck_state_watch():
             if loop != shown_loop[deck]:
                 shown_loop[deck] = loop
                 led(0x90 + deck - 1, 0x10, loop[0]); led(0x90 + deck - 1, 0x11, loop[1]); led(0x90 + deck - 1, 0x4D, loop[2])
+        # BEAT FX ON/OFF (channel 5, note 0x47, the note the button sends) follows the engine's own isBeatEffectOn.
+        fx = bool(d1 & 512) if fresh else False
+        if fx != shown_fx: shown_fx = fx; led(0x94, 0x47, fx)
         for deck, mask in ((1, h1), (2, h2)):
             mask = mask & 0xFF if fresh else 0
             if mask != hotcues[deck]: hotcues[deck] = mask; show_pads(deck)

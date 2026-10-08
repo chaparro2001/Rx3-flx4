@@ -59,8 +59,8 @@
 
 ## Work in progress
 
-- **Unlit FLX4 buttons**: SLIP and BEAT FX ON/OFF do not reflect state yet; their getters still need finding. Same path
-  as the rest: shim bit, bridge LED.
+- **Unlit FLX4 buttons**: SLIP does not reflect state yet; its getter still needs finding. BEAT FX ON/OFF now follows
+  `isBeatEffectOn` (0x4d1bc, bit 512; added 2026-10-08, to be verified on the FLX4). Same path as the rest: shim bit, bridge LED.
 - **Unmapped pad modes**: pad FX, sampler, keyboard and key shift are not mapped, as the RX3 has no direct equivalent for most of them.
 - **Device names**: SOURCE shows USB1/USB2 rather than each stick's volume label.
 - **No auto-restart**: if the player process crashes the service does not restart it; `systemctl restart rx3` is needed.
