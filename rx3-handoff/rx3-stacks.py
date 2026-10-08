@@ -13,14 +13,14 @@ SYSCALLS = {162: 'nanosleep', 265: 'clock_nanosleep', 240: 'futex', 3: 'read', 4
             336: 'ppoll', 252: 'epoll_wait', 346: 'epoll_pwait', 291: 'mq_timedreceive', 0: 'restart_syscall'}
 
 def elf_symbols(path):
-    """[(start, end, name)] of the FUNC symbols of a 32-bit little-endian ELF, plus its PT_LOAD (offset, vaddr) pairs."""
+    """[(start, end, name)] of the FUNC symbols of a 32-bit little-endian ELF, plus its PT_LOAD (offset, vaddr, flags)."""
     d = open(path, 'rb').read()
     if d[:4] != b'\x7fELF' or d[4] != 1: return [], []
     phoff, shoff = struct.unpack_from('<II', d, 28); phentsize, phnum, shentsize, shnum = struct.unpack_from('<HHHH', d, 42)
     loads = []
     for i in range(phnum):
-        p_type, p_offset, p_vaddr = struct.unpack_from('<III', d, phoff + i * phentsize)
-        if p_type == 1: loads.append((p_offset, p_vaddr))
+        p_type, p_offset, p_vaddr, _, _, _, p_flags = struct.unpack_from('<7I', d, phoff + i * phentsize)
+        if p_type == 1: loads.append((p_offset, p_vaddr, p_flags))
     secs = [struct.unpack_from('<IIIIIIIIII', d, shoff + i * shentsize) for i in range(shnum)]
     syms = []
     for s in secs:
@@ -51,7 +51,8 @@ def main():
         path = rx3_env.ROOT + f[5] if not f[5].startswith(rx3_env.ROOT) else f[5]
         if path not in images: images[path] = (*elf_symbols(path), [])
         syms, loads, ranges = images[path]
-        seg = next(((o, v) for o, v in loads if o & ~0xfff == off), (off, off))
+        # The executable segment: lld puts it a page-multiple higher in memory than in the file, after a read-only one.
+        seg = next(((o, v) for o, v, fl in loads if fl & 1 and o & ~0xfff == off), (off, off))
         ranges.append((lo, hi, lo - (seg[1] & ~0xfff)))
     def name_of(a):
         for path, (syms, loads, ranges) in images.items():

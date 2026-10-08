@@ -87,7 +87,9 @@ changing anything. Note that `uhubctl` lives in `/usr/sbin`, off a normal user's
 - `/home/rx3/rx3-rootfs/` — isolated ARM32 chroot built by `build-rootfs.sh` (re-runnable; rebuilds from `extracted/`).
   - `/root/pdj/rbp-pi`, `/root/gui`, `/root/settings` (writable), `/lib/fbshim.so` (fbshim.c + control-shim.c).
   - `/dev/fb0` regular 1280x800 RGB32 file; `/dev/tsc2007_2-0048` touch FIFO; `/dev/rx3-control` control FIFO;
-    `/dev/gpiodrv` 4096x0x01; `/dev/subucom_spi*` FIFOs; `/dev/printkdrv0` bind of /dev/null; null/zero/urandom/full/snd binds.
+    `/dev/gpiodrv` 4096x0x01 (rewritten by `rx3-start.sh` every start: the firmware writes zeros into it, and a zero left
+    on pin 126 = USB over-current hangs start-up in `PanelComPeerLinux::postMessage`, before the panel link exists - no
+    key, no audio; `rx3-stacks.py` shows it); `/dev/subucom_spi*` FIFOs; `/dev/printkdrv0` bind of /dev/null; null/zero/urandom/full/snd binds.
   - `/proc` is a fake directory: `cpuinfo`, `mounts`, `udev_usb*` FIFOs, `jog/*`. `/sys` fake backlight + paudiog.
   - `/etc/rx3-ctl` = ALSA ctl name used by the shim (`hw:CARD=...`); `/etc/asound.conf` generated from `asound.conf` template.
 - `/home/rx3/rx3-usb/usb1/{lower,upper,work}` — copy-on-write view of the USB stick (fuse-overlayfs; kernel overlayfs

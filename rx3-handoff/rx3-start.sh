@@ -15,6 +15,12 @@ fi
 
 # --- host preparation ---------------------------------------------------------
 $H/mount-rx3.sh >/dev/null
+# Fresh GPIO inputs every start, as on power-up: /dev/gpiodrv is a plain file of 0x01 bytes (one per pin, read at
+# pin offset), and the firmware writes zeros into it while it runs. Left over from earlier sessions, they piled up until
+# one covered pin 126, the USB over-current input: UsbStorageManager then reports over-current during start-up and
+# waits forever for the panel link (PanelComPeerLinux::postMessage), which is only opened later - start-up hangs, no
+# key or audio ever works. Seen on the Duet after a few sessions.
+python3 -c "open('$R/dev/gpiodrv','wb').write(bytes([1])*4096)" && chown $U $R/dev/gpiodrv
 # Root helper that performs the firmware's own USB STOP unmounts (see rx3-priv.sh); its FIFO must exist before launch.
 systemctl is-active -q rx3-priv.service || systemd-run --quiet --unit=rx3-priv --collect -p Restart=on-failure $H/rx3-priv.sh
 for i in $(seq 1 20); do [ -p $R/dev/rx3-priv ] && break; sleep 0.1; done
