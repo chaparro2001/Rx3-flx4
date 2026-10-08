@@ -148,7 +148,7 @@ if [ "${1:-}" = clean ]; then
   sudo systemctl stop rx3-priv rx3-pointer 'rx3-overlay-*' 'rx3-hotkeys-*' 2>/dev/null
   sudo systemctl stop rx3-desktop 2>/dev/null
   sudo rm -f /etc/systemd/system/rx3-desktop.service /etc/polkit-1/rules.d/50-rx3.rules "$RX3_USERHOME/.local/share/applications/rx3.desktop"
-  sudo rm -f /etc/systemd/system/rx3.service /etc/udev/rules.d/97-rx3-input.rules /etc/udev/rules.d/98-rx3-flx4.rules /etc/udev/rules.d/98-rx3-controller.rules /etc/udev/rules.d/99-rx3-usb.rules
+  sudo rm -f /etc/systemd/system/rx3.service /etc/udev/rules.d/96-rx3-backlight.rules /etc/udev/rules.d/97-rx3-input.rules /etc/udev/rules.d/98-rx3-flx4.rules /etc/udev/rules.d/98-rx3-controller.rules /etc/udev/rules.d/99-rx3-usb.rules
   sudo systemctl daemon-reload; sudo udevadm control --reload
   for m in $(findmnt -rn -o TARGET | grep -E "^($RX3_ROOT|$RX3_USB)/" | sort -r); do sudo umount -l "$m" 2>/dev/null; done
   sudo rm -rf "$RX3_ROOT" "$RX3_USB" "$RX3_BINDIR/rx3-fb-present" "$RX3_BINDIR/rx3-touch-bridge" "$RX3_LOGDIR"/rx3-*.log \
@@ -266,11 +266,16 @@ done
 sudo rm -f /etc/udev/rules.d/98-rx3-flx4.rules
 sed "s|@RX3_HOME@|$RX3_HOME|g" "$RX3_HOME/rx3.service.in" > "$tmp/rx3.service"
 sed "s|@RX3_HOME@|$RX3_HOME|g" "$RX3_HOME/rx3-desktop.service.in" > "$tmp/rx3-desktop.service"
+cat > "$tmp/96-rx3-backlight.rules" <<'RULE'
+# SETTINGS > BRIGHT -/+: the touch bridge runs as the player's user with the video group, so let video write the backlight.
+ACTION=="add", SUBSYSTEM=="backlight", RUN+="/bin/chgrp video /sys%p/brightness", RUN+="/bin/chmod g+w /sys%p/brightness"
+RULE
 # postmarketOS ships without these directories (Debian has them); install -m into a missing one fails.
 sudo mkdir -p /etc/udev/rules.d /etc/systemd/system
 sudo install -m 644 "$tmp"/*.rules /etc/udev/rules.d/ || exit 1
 sudo install -m 644 "$tmp/rx3.service" "$tmp/rx3-desktop.service" /etc/systemd/system/ || exit 1
 sudo udevadm control --reload
+sudo udevadm trigger -s backlight -c add   # the rule above, for the backlight that is already there
 sudo systemctl daemon-reload
 # polkit: the strip's CLOSE button (touch bridge, running as the user) stops rx3, and the XDJ-RX3 icon starts rx3-desktop.
 sudo mkdir -p /etc/polkit-1/rules.d

@@ -25,7 +25,8 @@ line each in `rx3.conf`. A USB mouse works as a pointer when there is no touch p
 either end, with the browser (SOURCE, BROWSE, SHORTCUT, SEARCH, UTILITY, BACK, UP/DOWN, ENTER), SETTINGS and X-FADER
 (crossfader on/off) between them. A DECK page is that deck alone, in larger buttons marked with the deck's colour: LOAD, PLAY/PAUSE, MASTER
 TEMPO, QUANTIZE, USB STOP and BACK. SETTINGS likewise has only BARS (show or hide the slider bars, remembered), the
-machine's IP address for SSH, and CLOSE (held 1 s: stop the player and, when it was started from the XDJ-RX3 icon,
+machine's IP address for SSH, BRIGHT -/+ for the panel's backlight, the battery level (below 15% on battery, a red line
+over the strip and a red SETTINGS button warn on every page), and CLOSE (held 1 s: stop the player and, when it was started from the XDJ-RX3 icon,
 return to the desktop) and BACK. Buttons that are toggles light up from
 the firmware's own state: PLAY, MASTER TEMPO, QUANTIZE, HP CUE, X-FADER. Two slider bars carry the channel
 faders, master and headphone levels and crossfader for use without a controller.

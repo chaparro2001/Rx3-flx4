@@ -5,6 +5,10 @@
 #define RX3_ROOT_PATH "/home/rx3/rx3-rootfs"
 #endif
 #include <stddef.h>
+#include <dirent.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #define UI_STATE RX3_ROOT_PATH "/dev/rx3-ui-state"
 #define UI_CONTROL RX3_ROOT_PATH "/dev/rx3-control"
 /* The firmware draws its screen at this size, whatever the panel. */
@@ -35,6 +39,8 @@ struct ui_state {unsigned magic;float level[6];unsigned pressed;unsigned headpho
 #define CMD_CLOSE 0xFFFD     /* held 1 s: stop the player. Handled by touch-bridge.c itself (systemctl), never sent to the shim;
                                 started from the XDJ-RX3 icon, rx3-session.sh then brings the desktop back */
 #define CMD_BARS 0xFFFC      /* press shows/hides the slider bars (UI_BARS_HIDDEN). Also handled by touch-bridge.c only */
+#define CMD_BRIGHT_UP 0xFFFA /* SETTINGS: backlight a step up / down (touch-bridge.c, through sysfs) */
+#define CMD_BRIGHT_DOWN 0xFFFB
 #define UI_STATE_DECK_OFFSET 52
 _Static_assert(offsetof(struct ui_state,deck)==UI_STATE_DECK_OFFSET&&offsetof(struct ui_state,hotcue)==UI_STATE_DECK_OFFSET+12&&offsetof(struct ui_state,chlevel)==UI_STATE_DECK_OFFSET+20,"control-shim.c writes deck[2], state_seq, hotcue[2], chlevel[2] from this offset");
 /* The button strip: BUTTON_ROWS rows of BUTTON_COLS cells under the content area, showing one *page* of buttons at a
@@ -89,16 +95,20 @@ static const struct button main_buttons[]={
  LIT("X-FADER","XF",CMD_XFADER,1,DECK_XFADER,C_SET),EMPTY,EMPTY,EMPTY};
 static const struct button deck1_buttons[]={DECK_PAGE(1)};
 static const struct button deck2_buttons[]={DECK_PAGE(2)};
-/* SETTINGS:  BARS 2 | IP address (4 cells) | . . | CLOSE 2
-               . . . . . . . . | BACK 2
-   BARS is drawn lit while the bars are on screen (fb-present.c), not from a deck bit. Cells SETTINGS_INFO_FIRST.. are
-   empty here, so touches pass through them, and the presenter draws one information box across them. */
+/* SETTINGS:  BARS 2   | IP address (4 cells)            | .  . | CLOSE 2
+               BRIGHT - | brightness % | BRIGHT + | battery (4 cells) | . | BACK 2
+   BARS is drawn lit while the bars are on screen (fb-present.c), not from a deck bit. The information cells are empty
+   here, so touches pass through them, and the presenter draws one box across each group. BRIGHT -/+ repeat when held. */
 #define SETTINGS_INFO_FIRST 2
 #define SETTINGS_INFO_CELLS 4
+#define SETTINGS_BRIGHT_CELL (BUTTON_COLS+1)
+#define SETTINGS_BATTERY_FIRST (BUTTON_COLS+3)
+#define SETTINGS_BATTERY_CELLS 4
 static const struct button settings_buttons[]={
  {"BARS",0,CMD_BARS,0,0,0,-1,0,C_SET,2,0,0},EMPTY,EMPTY,EMPTY,EMPTY,EMPTY,EMPTY,EMPTY,
  {"CLOSE (hold)","CLOSE",CMD_CLOSE,0,0,0,-1,0,C_STOP,2,0,0},EMPTY,
- EMPTY,EMPTY,EMPTY,EMPTY,EMPTY,EMPTY,EMPTY,EMPTY,GOTO("BACK",0,PAGE_MAIN,C_KEY,2,0),EMPTY
+ {"BRIGHT -","DIM",CMD_BRIGHT_DOWN,0,1,0,-1,0,C_SET,0,0,0},EMPTY,{"BRIGHT +","BRIGHT",CMD_BRIGHT_UP,0,1,0,-1,0,C_SET,0,0,0},
+ EMPTY,EMPTY,EMPTY,EMPTY,EMPTY,GOTO("BACK",0,PAGE_MAIN,C_KEY,2,0),EMPTY
 };
 struct page {const struct button *buttons;int n;};
 #define PAGE(t) {t,(int)(sizeof(t)/sizeof*(t))}
@@ -195,4 +205,31 @@ enum {G_NONE,G_ENTER,G_BACK,G_LOAD,G_DECK};
 static inline int ui_mode_now(int base,const struct ui_state*st){return base==UI_FULL&&(st->ui_flags&UI_BARS_HIDDEN)?UI_STRIP:base;}
 /* RX3_FB names the framebuffer to draw on (rx3-env.sh picks the DSI panel when one exists). */
 static inline const char *fb_device(void){const char*e=getenv("RX3_FB");return e&&*e?e:"/dev/fb0";}
+/* ---- Backlight and battery (SETTINGS) -------------------------------------------------------------------------
+   The backlight is the first /sys/class/backlight entry (RX3_BACKLIGHT=<name> picks another); install.sh's udev rule
+   lets the video group write it, which is how the touch bridge sets it. The battery is the first power supply of type
+   Battery that is not some device's own (a pen, a mouse: scope Device). An HDMI Pi has neither; the boxes then say so. */
+static inline int sysfs_read(const char*dir,const char*name,char*buf,int n){char p[300];snprintf(p,sizeof p,"%s/%s",dir,name);
+ FILE*f=fopen(p,"r");if(!f)return -1;int ok=fgets(buf,n,f)!=0;fclose(f);if(!ok)return -1;buf[strcspn(buf,"\n")]=0;return 0;}
+static inline long sysfs_long(const char*dir,const char*name){char b[32];return sysfs_read(dir,name,b,sizeof b)?-1:atol(b);}
+static inline int sysfs_find(const char*cls,const char*type,char*dir,int n){DIR*d=opendir(cls);struct dirent*e;int found=0;if(!d)return 0;
+ while(!found&&(e=readdir(d))){char p[300],t[32];if(e->d_name[0]=='.')continue;snprintf(p,sizeof p,"%s/%s",cls,e->d_name);
+  if(type&&(sysfs_read(p,"type",t,sizeof t)||strcmp(t,type)))continue;
+  if(type&&!sysfs_read(p,"scope",t,sizeof t)&&!strcmp(t,"Device"))continue;
+  snprintf(dir,n,"%s",p);found=1;}
+ closedir(d);return found;}
+static inline int backlight_dir(char*dir,int n){const char*e=getenv("RX3_BACKLIGHT");
+ if(e&&*e){snprintf(dir,n,"/sys/class/backlight/%s",e);return 1;}return sysfs_find("/sys/class/backlight",0,dir,n);}
+/* Brightness as a percentage of max_brightness, -1 without a backlight. */
+static inline int backlight_percent(void){char d[256];if(!backlight_dir(d,sizeof d))return -1;
+ long m=sysfs_long(d,"max_brightness"),b=sysfs_long(d,"brightness");return m>0&&b>=0?(int)((b*100+m/2)/m):-1;}
+/* Battery charge in percent (-1: no battery); *plugged is set while it charges or sits full on the charger. */
+static inline int battery_percent(int*plugged){char d[256],s[32];*plugged=0;
+ if(!sysfs_find("/sys/class/power_supply","Battery",d,sizeof d))return -1;
+ if(!sysfs_read(d,"status",s,sizeof s))*plugged=!strcmp(s,"Charging")||!strcmp(s,"Full")||!strcmp(s,"Not charging");
+ long c=sysfs_long(d,"capacity");if(c>=0)return c>100?100:(int)c;
+ long now=sysfs_long(d,"energy_now"),full=sysfs_long(d,"energy_full");
+ if(now<0||full<=0){now=sysfs_long(d,"charge_now");full=sysfs_long(d,"charge_full");}
+ return now>=0&&full>0?(int)(now*100/full):-1;}
+#define BATTERY_LOW 15     /* at or below, and not plugged: a red line over the strip and a red SETTINGS button */
 #endif

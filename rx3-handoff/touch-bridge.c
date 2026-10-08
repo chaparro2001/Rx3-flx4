@@ -36,12 +36,20 @@ static void apply_bars(int hidden){if(hidden)state->ui_flags|=UI_BARS_HIDDEN;els
 static int load_bars(void){FILE*f=*prefs?fopen(prefs,"r"):0;if(!f)return 0;char l[64]={0};int h=fgets(l,sizeof l,f)&&!strncmp(l,"bars=hidden",11);fclose(f);return h;}
 static void save_bars(void){FILE*f=*prefs?fopen(prefs,"w"):0;if(!f){if(*prefs)perror(prefs);return;}
  fprintf(f,"bars=%s\n",state->ui_flags&UI_BARS_HIDDEN?"hidden":"shown");fclose(f);}
+/* BRIGHT -/+: a tenth of the backlight's range per step (held, they repeat like UP/DOWN), never under a twentieth, so
+   the panel cannot be dimmed to black. Writing needs install.sh's udev rule (video group) and that group here. */
+static void brightness_step(int dir){char d[256],p[300];if(!backlight_dir(d,sizeof d)){fprintf(stderr,"BRIGHT: no backlight\n");return;}
+ long m=sysfs_long(d,"max_brightness"),b=sysfs_long(d,"brightness");if(m<=0||b<0)return;
+ long step=m/10>0?m/10:1,lo=m/20>0?m/20:1,v=b+dir*step;if(v<lo)v=lo;if(v>m)v=m;if(v==b)return;
+ snprintf(p,sizeof p,"%s/brightness",d);FILE*f=fopen(p,"w");if(!f){perror(p);return;}
+ fprintf(f,"%ld\n",v);if(fclose(f))perror(p);else fprintf(stderr,"BRIGHT: %ld -> %ld of %ld\n",b,v,m);}
 static void button(int i,int down){
  const struct button*b=&page_of(state->page)->buttons[i];if(!b->label||b->page>=0)return;
  if(down)state->pressed|=1u<<i;else state->pressed&=~(1u<<i);
  if(b->key==CMD_CLOSE){if(down)close_since=millis();
   else if(close_since&&millis()-close_since>=1000){fprintf(stderr,"CLOSE: stopping the player\n");if(system("systemctl stop --no-block rx3.service"))perror("CLOSE");}
   if(!down)close_since=0;return;}
+ if(b->key==CMD_BRIGHT_UP||b->key==CMD_BRIGHT_DOWN){if(down)brightness_step(b->key==CMD_BRIGHT_UP?1:-1);return;}
  if(b->key==CMD_BARS){if(down){apply_bars(!(state->ui_flags&UI_BARS_HIDDEN));save_bars();
   fprintf(stderr,"BARS: %s, strip %d px, bars %d px\n",state->ui_flags&UI_BARS_HIDDEN?"hidden":"shown",u.sh,u.bw);}return;}
  if(b->scroll){if(down)command(b->key,4,0,b->scroll,0);return;}

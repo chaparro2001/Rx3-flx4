@@ -70,13 +70,19 @@ static int net_info(char*l1,size_t n1,char*l2,size_t n2){
  if(!found){snprintf(l1,n1,"NO NETWORK");snprintf(l2,n2,"CLOSE, then set up Wi-Fi on the desktop");return 0;}
  if(found>1)snprintf(l1,n1,"IP %s  +%d",ip,found-1);else snprintf(l1,n1,"IP %s",ip);
  snprintf(l2,n2,"%s  -  %s",ifn,host);return 1;}
-/* The information box across the SETTINGS cells: dimmer than a button and with no pressed state, as it does nothing. Drawn
-   into the chrome, like the strip, and only when its text changes. */
-static void draw_info(const struct ui*u,const char*l1,const char*l2,int up){uint32_t *live=frame;frame=chrome;
- int x,y,w,h,x2,y2,w2,h2;button_rect(u,SETTINGS_INFO_FIRST,&x,&y,&w,&h);button_rect(u,SETTINGS_INFO_FIRST+SETTINGS_INFO_CELLS-1,&x2,&y2,&w2,&h2);
- w=x2+w2-x;int m=PX(4),room=w-PX(24);box(x+m,y+m,w-2*m,h-2*m,0x1c2a35);
- label(x+w/2,y+h*2/5,l1,fitsize(l1,room,PX(26)),up?0xffffff:0x8a98a4);label(x+w/2,y+h*3/4,l2,fitsize(l2,room,PX(18)),0xa9b6c1);
+/* An information box across `cells` strip cells from `first`: dimmer than a button and with no pressed state, as it does
+   nothing. Drawn into the chrome, like the strip, and only when its text changes. `up` = white text, else grey; `alert` =
+   red box. A box with no second line centres its first. */
+static void draw_info(const struct ui*u,int first,int cells,const char*l1,const char*l2,int up,int alert){uint32_t *live=frame;frame=chrome;
+ int x,y,w,h,x2,y2,w2,h2;button_rect(u,first,&x,&y,&w,&h);button_rect(u,first+cells-1,&x2,&y2,&w2,&h2);
+ w=x2+w2-x;int m=PX(4),room=w-PX(24);box(x+m,y+m,w-2*m,h-2*m,alert?0x7a2f2f:0x1c2a35);
+ if(*l2){label(x+w/2,y+h*2/5,l1,fitsize(l1,room,PX(26)),up?0xffffff:0x8a98a4);label(x+w/2,y+h*3/4,l2,fitsize(l2,room,PX(18)),0xa9b6c1);}
+ else label(x+w/2,y+h/2,l1,fitsize(l1,room,PX(26)),up?0xffffff:0x8a98a4);
  frame=live;}
+/* SETTINGS boxes for the battery and the backlight, from sysfs (pi-controls.h). */
+static void battery_text(int pct,int plugged,char*l1,size_t n1,char*l2,size_t n2){
+ if(pct<0){snprintf(l1,n1,"NO BATTERY");snprintf(l2,n2,"mains power");return;}
+ snprintf(l1,n1,"BATTERY %d%%",pct);snprintf(l2,n2,"%s",plugged?"charging":pct<=BATTERY_LOW?"LOW - plug in the charger":"on battery");}
 static long ms(void){struct timespec t;clock_gettime(CLOCK_MONOTONIC,&t);return t.tv_sec*1000+t.tv_nsec/1000000;}
 /* Side-band gestures (touch-bridge.c): dim hints drawn into the chrome, and a short flash naming what a gesture did. */
 static void draw_band_hints(const struct ui*u){
@@ -155,13 +161,20 @@ int main(int argc,char**argv){
   for(int i=0;fonts[i];i++) fprintf(stderr,"  %s\n",fonts[i]);
   return 1;
  }
- int shown=-1;long net_at=0,flash_until=0;unsigned flash_seen=state->gesture_seq;char net1[64]="",net2[96]="";
+ int shown=-1;long net_at=0,flash_until=0,power_at=0;unsigned flash_seen=state->gesture_seq;char net1[64]="",net2[96]="";
+ char bat1[32]="",bat2[48]="",bri[16]="";int battery=-1,plugged=0,low=0;
  for(;;){
  int mode=ui_mode_now(base_mode,state);if(mode!=laid){relayout(mode);shown=-1;}   /* at start, and on SETTINGS > BARS */
  int pg=state->page>=0&&state->page<NPAGES?state->page:0;
- if(u.sh&&pg!=shown){draw_strip(&u,pg);shown=pg;net_at=0;}   /* a fresh strip has no information box yet */
+ int redraw=0;if(u.sh&&pg!=shown){draw_strip(&u,pg);shown=pg;net_at=0;redraw=1;}   /* a fresh strip has no information box yet */
  if(u.sh&&pg==PAGE_SETTINGS&&ms()>=net_at){char a[64],b[96];int up=net_info(a,sizeof a,b,sizeof b);   /* every 5 s */
-  if(!net_at||strcmp(a,net1)||strcmp(b,net2)){strcpy(net1,a);strcpy(net2,b);draw_info(&u,net1,net2,up);}net_at=ms()+5000;}
+  if(redraw||strcmp(a,net1)||strcmp(b,net2)){strcpy(net1,a);strcpy(net2,b);draw_info(&u,SETTINGS_INFO_FIRST,SETTINGS_INFO_CELLS,net1,net2,up,0);}net_at=ms()+5000;}
+ if(ms()>=power_at||redraw){   /* battery every 2 s on every page (the low warning), brightness with it on SETTINGS */
+  battery=battery_percent(&plugged);low=battery>=0&&battery<=BATTERY_LOW&&!plugged;power_at=ms()+(pg==PAGE_SETTINGS?400:2000);
+  if(u.sh&&pg==PAGE_SETTINGS){char a[32],b[48],c[16];int bl=backlight_percent();battery_text(battery,plugged,a,sizeof a,b,sizeof b);
+   if(redraw||strcmp(a,bat1)||strcmp(b,bat2)){strcpy(bat1,a);strcpy(bat2,b);draw_info(&u,SETTINGS_BATTERY_FIRST,SETTINGS_BATTERY_CELLS,bat1,bat2,battery>=0,low);}
+   if(bl>=0)snprintf(c,sizeof c,"%d%%",bl);else snprintf(c,sizeof c,"--");
+   if(redraw||strcmp(c,bri)){strcpy(bri,c);draw_info(&u,SETTINGS_BRIGHT_CELL,1,bri,"",bl>=0,0);}}}
  memcpy(frame,chrome,sizeof(uint32_t)*UW*UH);
  for(int y=0;y<u.ch;y++){uint32_t *out=frame+(u.cy+y)*UW+u.cx;const uint32_t *in=s+row[y]*SRC_W;
   if(!filter)for(int x=0;x<u.cw;x++)out[x]=in[col[x]];
@@ -170,7 +183,10 @@ int main(int argc,char**argv){
     out[x]=((a>>2)&0x3f3f3f)+((b>>2)&0x3f3f3f)+((e>>2)&0x3f3f3f)+((g>>2)&0x3f3f3f);}}}   /* per-channel mean, no carry between channels */
  int fresh=state_fresh(state);
  if(u.sh){for(int i=0;i<pages[pg].n;i++){const struct button*b=&pages[pg].buttons[i];int down=state->pressed&(1u<<i);
-  int lit=b->key==CMD_BARS?u.bw>0:fresh&&b->light&&b->channel>=1&&b->channel<=2&&(state->deck[b->channel-1]&b->light);if(down||lit)drawbutton(&u,pg,i,down,lit);}}
+  int lit=b->key==CMD_BARS?u.bw>0:fresh&&b->light&&b->channel>=1&&b->channel<=2&&(state->deck[b->channel-1]&b->light);if(down||lit)drawbutton(&u,pg,i,down,lit);
+  if(low&&b->page==PAGE_SETTINGS){int x,y,w,h,m=PX(4);char t[24];button_box(&u,b,i,&x,&y,&w,&h);snprintf(t,sizeof t,"BATT %d%%",battery);   /* low battery */
+   box(x+m,y+m,w-2*m,h-2*m,down?0x536f84:0xb02a2a);label(x+w/2,y+h/2,t,fitsize(t,w-PX(24),PX(26)),0xffffff);}}
+  if(low)box(u.sx,u.sy,u.sw,PX(5),0xe03a3a);}   /* and a red line along the top of the strip, on every page */
  if(state->cursor_visible){int cx=state->cursor_x,cy=state->cursor_y;   /* arrow pointer: black outline, white fill */
   for(int y=0;y<22;y++)for(int x=0;x<=y&&x<16;x++){int px=cx+x,py=cy+y;if(px<0||px>=UW||py<0||py>=UH)continue;
    int edge=(x==0||x==y||y==21||x==15);frame[py*UW+px]=edge?0x000000:0xffffff;}}
